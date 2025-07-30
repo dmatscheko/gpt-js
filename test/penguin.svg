@@ -1,0 +1,27 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Body -->
+  <ellipse cx="100" cy="100" rx="60" ry="70" fill="#000000" />
+  
+  <!-- Belly -->
+  <ellipse cx="100" cy="100" rx="55" ry="65" fill="#FFFFFF" />
+  
+  <!-- Head -->
+  <circle cx="100" cy="60" r="30" fill="#000000" />
+  
+  <!-- Eyes -->
+  <circle cx="85" cy="50" r="8" fill="#FFFFFF" />
+  <circle cx="115" cy="50" r="8" fill="#FFFFFF" />
+  <circle cx="85" cy="50" r="4" fill="#000000" />
+  <circle cx="115" cy="50" r="4" fill="#000000" />
+  
+  <!-- Beak -->
+  <polygon points="100,70 120,80 100,90" fill="#FFA500" />
+  
+  <!-- Flippers -->
+  <ellipse cx="60" cy="100" rx="15" ry="35" fill="#000000" transform="rotate(-30 60 100)" />
+  <ellipse cx="140" cy="100" rx="15" ry="35" fill="#000000" transform="rotate(30 140 100)" />
+  
+  <!-- Feet -->
+  <ellipse cx="85" cy="160" rx="15" ry="8" fill="#FFA500" />
+  <ellipse cx="115" cy="160" rx="15" ry="8" fill="#FFA500" />
+</svg>

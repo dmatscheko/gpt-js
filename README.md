@@ -14,7 +14,7 @@ If your API key has acces to GPT-4, you can choose that model in the settings.
 
 You can test it at: [https://huggingface.co/spaces/dma123/gpt-js](https://huggingface.co/spaces/dma123/gpt-js).
 
-You can also run it locally:
+You can also run it locally: `python -m http.server 8000`
 
 1. Create an OpenAI account at [https://platform.openai.com/account](https://platform.openai.com/account).
 2. Create an API key at [https://platform.openai.com/account/api-keys](https://platform.openai.com/account/api-keys).
