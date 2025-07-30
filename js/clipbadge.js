@@ -105,15 +105,12 @@ class ClipBadge {
 
             if (copyIcon.classList.contains('text-success')) return;
 
+            let textToCopy = plainText;
             if (this.#settings.onBeforeCodeCopied) {
-                plainText = this.#settings.onBeforeCodeCopied(plainText, highlightEl);
+                textToCopy = this.#settings.onBeforeCodeCopied(plainText, highlightEl);
             }
 
-            const clipboardData = { 'text/plain': new Blob([plainText], { type: 'text/plain' }) };
-            if (htmlText !== '') {
-                clipboardData['text/html'] = new Blob([htmlText], { type: 'text/html' });
-            }
-            navigator.clipboard.write([new ClipboardItem(clipboardData)]).then(() => {
+            const setCopied = () => {
                 copyIcon.className = this.#settings.checkIconClass;
                 copyIcon.classList.add('clip-badge-copy-icon');
                 copyIcon.innerHTML = this.#settings.checkIconContent;
@@ -123,7 +120,40 @@ class ClipBadge {
                     copyIcon.classList.add('clip-badge-copy-icon');
                     copyIcon.innerHTML = this.#settings.copyIconContent;
                 }, 2000);
-            });
+            };
+
+            if (navigator.clipboard && navigator.clipboard.write) {
+                const clipboardData = { 'text/plain': new Blob([textToCopy], { type: 'text/plain' }) };
+                if (htmlText !== '') {
+                    clipboardData['text/html'] = new Blob([htmlText], { type: 'text/html' });
+                }
+                navigator.clipboard.write([new ClipboardItem(clipboardData)]).then(() => {
+                    setCopied();
+                }).catch(err => {
+                    console.error('Unable to copy using Clipboard API', err);
+                });
+            } else {
+                // Fallback for non-secure contexts
+                const textArea = document.createElement('textarea');
+                textArea.value = textToCopy;
+                textArea.style.top = '0';
+                textArea.style.left = '0';
+                textArea.style.position = 'fixed';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        setCopied();
+                    } else {
+                        console.error('Fallback: Copy command was unsuccessful');
+                    }
+                } catch (err) {
+                    console.error('Fallback: Unable to copy', err);
+                }
+                document.body.removeChild(textArea);
+            }
         });
 
         highlightEl.classList.add('clip-badge-pre');
