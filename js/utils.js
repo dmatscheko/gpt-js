@@ -147,16 +147,14 @@
                 const p = document.createElement('p');
                 p.textContent = 'No models available.';
                 fieldset.appendChild(p);
-                return;
             }
-            models.forEach((model, i) => {
+            models.forEach((model) => {
                 const safeId = model.id.replace(/[^a-z0-9_-]/gi, '_');
                 const input = document.createElement('input');
                 input.type = 'radio';
                 input.name = 'model';
                 input.value = model.id;
                 input.id = `model_${safeId}`;
-                if (i === 0 || model.id === 'gpt-3.5-turbo') input.checked = true;
                 const label = document.createElement('label');
                 label.setAttribute('for', `model_${safeId}`);
                 label.textContent = model.id;
@@ -164,6 +162,47 @@
                 fieldset.appendChild(label);
                 fieldset.appendChild(document.createElement('br'));
             });
+            // Add custom model option
+            const customInput = document.createElement('input');
+            customInput.type = 'radio';
+            customInput.name = 'model';
+            customInput.value = 'custom';
+            customInput.id = 'model_custom';
+            const customLabel = document.createElement('label');
+            customLabel.setAttribute('for', 'model_custom');
+            customLabel.textContent = 'Custom: ';
+            const customText = document.createElement('input');
+            customText.type = 'text';
+            customText.id = 'custom_model';
+            customText.placeholder = 'Enter model ID';
+            customLabel.appendChild(customText);
+            fieldset.appendChild(customInput);
+            fieldset.appendChild(customLabel);
+            fieldset.appendChild(document.createElement('br'));
+            // Set stored model
+            try {
+                const storedModel = localStorage.getItem('model');
+                if (storedModel) {
+                    let found = false;
+                    const radios = fieldset.querySelectorAll('input[name="model"]');
+                    for (const radio of radios) {
+                        if (radio.value === storedModel) {
+                            radio.checked = true;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        customInput.checked = true;
+                        customText.value = storedModel;
+                    }
+                } else {
+                    const defaultRadio = fieldset.querySelector('input[value="gpt-3.5-turbo"]') || fieldset.querySelector('input[name="model"]');
+                    if (defaultRadio) defaultRadio.checked = true;
+                }
+            } catch (error) {
+                console.error(error);
+            }
         }).catch(err => {
             console.error(err);
             alert('Failed to load models: ' + err.message);
@@ -179,7 +218,15 @@
                 controller.abort();
                 return;
             }
-            openaiChat(ui.messageEl.value, chatlog, document.querySelector('input[name="model"]:checked').value, Number(ui.temperatureEl.value), Number(ui.topPEl.value), document.querySelector('input[name="user_role"]:checked').value, ui);
+            let model = document.querySelector('input[name="model"]:checked').value;
+            if (model === 'custom') {
+                model = document.getElementById('custom_model').value.trim();
+                if (!model) {
+                    alert('Please enter a custom model ID.');
+                    return;
+                }
+            }
+            openaiChat(ui.messageEl.value, chatlog, model, Number(ui.temperatureEl.value), Number(ui.topPEl.value), document.querySelector('input[name="user_role"]:checked').value, ui);
             document.getElementById('user').checked = true;
             ui.messageEl.value = '';
             ui.messageEl.style.height = 'auto';
@@ -303,6 +350,28 @@
 
         ui.refreshModelsBtn = document.getElementById('refresh-models-btn');
         ui.refreshModelsBtn.addEventListener('click', () => globals.loadModels(ui));
+
+        // Save selected model on change
+        const saveModel = () => {
+            let model = document.querySelector('input[name="model"]:checked')?.value;
+            if (model === 'custom') {
+                model = document.getElementById('custom_model')?.value.trim();
+            }
+            if (model) {
+                localStorage.setItem('model', model);
+            }
+        };
+
+        document.getElementById('models-fieldset').addEventListener('change', saveModel);
+
+        const customText = document.getElementById('custom_model');
+        if (customText) {
+            customText.addEventListener('input', () => {
+                if (document.getElementById('model_custom')?.checked) {
+                    saveModel();
+                }
+            });
+        }
 
     }
 

@@ -56,6 +56,10 @@
             console.error(error);
         }
 
+        if (globals.api_key) {
+            globals.loadModels(ui);
+        }
+
         if (chatlog.rootAlternatives == null) {
             // Start new chat, if no old chat could be loaded
             ui.newChatBtn.click();
