@@ -17,6 +17,7 @@
             temperatureValueEl: document.getElementById('temperature-value'),
             topPEl: document.getElementById('top_p'),
             topPValueEl: document.getElementById('top_p-value'),
+            endpointEl: document.getElementById('endpoint'),
             loginBtn: document.getElementById('login-btn'),
             logoutBtn: document.getElementById('logout-btn')
         };
@@ -37,6 +38,16 @@
             } catch (error) {
                 console.error(error);
             }
+        }
+
+        // Load endpoint from localStorage
+        try {
+            const storedEndpoint = localStorage.getItem('endpoint');
+            if (storedEndpoint) {
+                ui.endpointEl.value = storedEndpoint;
+            }
+        } catch (error) {
+            console.error(error);
         }
 
         if (chatlog.rootAlternatives == null) {

@@ -45,7 +45,7 @@
             // do not send initial prompt without other messages
             if (payload.messages.length <= 1) return;
 
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            const response = await fetch(ui.endpointEl.value, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: {
@@ -222,6 +222,14 @@
         ui.topPValueEl.textContent = ui.topPEl.value;
         ui.topPEl.addEventListener('input', () => {
             ui.topPValueEl.textContent = ui.topPEl.value;
+        });
+
+        ui.endpointEl.addEventListener('input', () => {
+            try {
+                localStorage.setItem('endpoint', ui.endpointEl.value);
+            } catch (error) {
+                console.error(error);
+            }
         });
 
         ui.settingsBtn.addEventListener('click', () => {
