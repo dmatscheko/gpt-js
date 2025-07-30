@@ -28,17 +28,20 @@
         getApiKey();
 
         // Load old chat
-        try {
-            const data = JSON.parse(localStorage.chatlog);
-            chatlog.load(data.rootAlternatives);
-            ui.chatlogEl.update();
-        } catch (error) {
-            console.error(error);
+        const storedChatlog = localStorage.getItem('chatlog');
+        if (storedChatlog) {
+            try {
+                const data = JSON.parse(storedChatlog);
+                chatlog.load(data.rootAlternatives);
+                ui.chatlogEl.update();
+            } catch (error) {
+                console.error(error);
+            }
         }
 
         if (chatlog.rootAlternatives == null) {
             // Start new chat, if no old chat could be loaded
-            newChatBtn.click();
+            ui.newChatBtn.click();
         }
     });
 
