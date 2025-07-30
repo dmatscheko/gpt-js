@@ -91,7 +91,8 @@
                 return;
             }
             if (('' + error).startsWith("Error: You didn't provide an API key.") || ('' + error).startsWith('Error: Incorrect API key provided:')) {
-                getApiKey();
+                ui.settingsEl.classList.add('open');
+                setTimeout(() => ui.api_key.focus(), 100);
             }
 
             if (!entryCreated) {
@@ -236,68 +237,37 @@
             ui.settingsEl.classList.toggle('open');
         });
 
-        ui.loginBtn.addEventListener('click', () => {
-            getApiKey();
-        });
-
-        ui.logoutBtn.addEventListener('click', () => {
+        ui.api_key.addEventListener('input', () => {
             try {
-                localStorage.removeItem('api_key');
+                localStorage.api_key = ui.api_key.value;
+                globals.api_key = ui.api_key.value;
             } catch (error) {
                 console.error(error);
             }
-            location.reload();
         });
 
-    }
+        ui.clear_api_key_btn.addEventListener('click', () => {
+            try {
+                localStorage.removeItem('api_key');
+                globals.api_key = '';
+                ui.api_key.value = '';
+            } catch (error) {
+                console.error(error);
+            }
+        });
 
-
-    const showLoginButton = () => {
-        const login = document.getElementById('session-login');
-        const logout = document.getElementById('session-logout');
-        login.style.display = 'block';
-        logout.style.display = 'none';
-    }
-
-
-    const showLogoutButton = () => {
-        const login = document.getElementById('session-login');
-        const logout = document.getElementById('session-logout');
-        login.style.display = 'none';
-        logout.style.display = 'block';
     }
 
 
     globals.getApiKey = () => {
-        // If no or an empty API key has been set, then try to get one from localStorage
-        if (typeof api_key == 'undefined' || api_key == '') {
-            try {
-                globals.api_key = localStorage.api_key;
-            } catch (error) {
-                console.error(error);
-            }
-            if (typeof api_key != 'undefined' && api_key != '') {
-                showLogoutButton();
-                return;
-            }
+        try {
+            globals.api_key = localStorage.api_key;
+        } catch (error) {
+            console.error(error);
         }
-        showLoginButton();
-
-        // If any API key has been set, or localStorage was empty, ask the user for a new API key
-        setTimeout(() => {
-            globals.api_key = prompt('Enter an OpenAI API key:');
-            if (globals.api_key == null) globals.api_key = '';
-            try {
-                localStorage.api_key = api_key;
-            } catch (error) {
-                console.error(error);
-            }
-            if (typeof api_key == 'undefined' || api_key == '') {
-                showLoginButton();
-            } else {
-                showLogoutButton();
-            }
-        }, 0);
+        if (typeof globals.api_key === 'undefined') {
+            globals.api_key = '';
+        }
     }
 
 

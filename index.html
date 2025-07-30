@@ -111,27 +111,23 @@
             <input type="radio" id="assistant" name="user_role" value="assistant">
             <label for="assistant">Assistant</label>
         </fieldset>
-        <p>
-            <label for="endpoint">API Endpoint</label><br>
+        <br>
+        <fieldset>
+            <legend>Connection</legend>
+            <label for="endpoint" style="margin-bottom: 4px; display: block;">API Endpoint</label>
             <input type="text" id="endpoint" value="https://api.openai.com/v1/chat/completions">
-        </p>
-        <p>
-            <div id="session">
-                <span>Session (API key)</span><br>
-                <div id="session-login">
-                    <label for="login-btn">Login</label>
-                    <button id="login-btn" title="Login" class="toolbtn">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 19a1 1 0 1 0 0 2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-5a1 1 0 1 0 0 2h5v14h-5z" fill="currentColor"/><path d="M15.714 12.7a.996.996 0 0 0 .286-.697v-.006a.997.997 0 0 0-.293-.704l-4-4a1 1 0 1 0-1.414 1.414L12.586 11H3a1 1 0 1 0 0 2h9.586l-2.293 2.293a1 1 0 1 0 1.414 1.414l4-4 .007-.007z" fill="currentColor"/></svg>
-                    </button>
-                </div>
-                <div id="session-logout">
-                    <label for="logout-btn">Logout</label>
-                    <button id="logout-btn" title="Logout" class="toolbtn">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M11 20a1 1 0 0 0-1-1H5V5h5a1 1 0 1 0 0-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5a1 1 0 0 0 1-1z" fill="currentColor"/><path d="M21.714 12.7a.996.996 0 0 0 .286-.697v-.006a.997.997 0 0 0-.293-.704l-4-4a1 1 0 1 0-1.414 1.414L18.586 11H9a1 1 0 1 0 0 2h9.586l-2.293 2.293a1 1 0 0 0 1.414 1.414l4-4 .007-.007z" fill="currentColor"/></svg>
-                    </button>
-                </div>
+            <label for="api_key" style="margin-bottom: 4px; display: block; margin-top: 12px;">API Key</label>
+            <div style="position: relative;">
+                <input type="password" id="api_key">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <button id="clear_api_key-btn" title="Clear API key" class="toolbtn" style="position: absolute; right: 0px; bottom: 0px">
+                    <svg width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 12 L10 4 H22 V19 H10 Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>
+                        <path d="M12 9 Q15 10 17 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M12 15 Q15 14 17 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
             </div>
-        </p>
+        </fieldset>
     </div>
     <script src="js/3rdparty/katex.min.js"></script>
     <script src="js/3rdparty/auto-render.min.js"></script>

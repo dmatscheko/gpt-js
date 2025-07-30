@@ -18,8 +18,8 @@
             topPEl: document.getElementById('top_p'),
             topPValueEl: document.getElementById('top_p-value'),
             endpointEl: document.getElementById('endpoint'),
-            loginBtn: document.getElementById('login-btn'),
-            logoutBtn: document.getElementById('logout-btn')
+            api_key: document.getElementById('api_key'),
+            clear_api_key_btn: document.getElementById('clear_api_key-btn')
         };
 
         // Set up event listeners and initialize chat
@@ -27,6 +27,12 @@
 
         // Get API key
         getApiKey();
+
+        ui.api_key.value = globals.api_key || '';
+        if (!globals.api_key) {
+            ui.settingsEl.classList.add('open');
+            setTimeout(() => ui.api_key.focus(), 100);
+        }
 
         // Load old chat
         const storedChatlog = localStorage.getItem('chatlog');
