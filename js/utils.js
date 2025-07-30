@@ -125,6 +125,51 @@
         return datePrompt;
     }
 
+    globals.loadModels = function(ui) {
+        const endpoint = ui.endpointEl.value;
+        let modelsUrl = endpoint.replace(/\/chat\/completions$/, '/models');
+        fetch(modelsUrl, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${globals.api_key}`
+            }
+        }).then(resp => {
+            if (!resp.ok) throw new Error('Failed to fetch models: ' + resp.statusText);
+            return resp.json();
+        }).then(data => {
+            let models = data.data || [];
+            models = models.sort((a, b) => a.id.localeCompare(b.id));
+            const fieldset = document.getElementById('models-fieldset');
+            const toRemove = fieldset.querySelectorAll('input[type="radio"][name="model"], label[for^="model_"], br');
+            toRemove.forEach(el => el.remove());
+            if (models.length === 0) {
+                const p = document.createElement('p');
+                p.textContent = 'No models available.';
+                fieldset.appendChild(p);
+                return;
+            }
+            models.forEach((model, i) => {
+                const safeId = model.id.replace(/[^a-z0-9_-]/gi, '_');
+                const input = document.createElement('input');
+                input.type = 'radio';
+                input.name = 'model';
+                input.value = model.id;
+                input.id = `model_${safeId}`;
+                if (i === 0 || model.id === 'gpt-3.5-turbo') input.checked = true;
+                const label = document.createElement('label');
+                label.setAttribute('for', `model_${safeId}`);
+                label.textContent = model.id;
+                fieldset.appendChild(input);
+                fieldset.appendChild(label);
+                fieldset.appendChild(document.createElement('br'));
+            });
+        }).catch(err => {
+            console.error(err);
+            alert('Failed to load models: ' + err.message);
+        });
+    }
+
     // Sets up event listeners for the chat interface
     // ChatApp.prototype.setUpEventListeners = () => {
     globals.setUpEventListeners = (chatlog, ui) => {
@@ -255,6 +300,9 @@
                 console.error(error);
             }
         });
+
+        ui.refreshModelsBtn = document.getElementById('refresh-models-btn');
+        ui.refreshModelsBtn.addEventListener('click', () => globals.loadModels(ui));
 
     }
 
