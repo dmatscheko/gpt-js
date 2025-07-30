@@ -69,8 +69,8 @@
         </button>
     </div>
     <div id="settings">
-        <p>
-            <label for="model">GPT model</label><br>
+        <fieldset>
+            <legend>GPT model</legend>
 
             <input type="radio" id="model_gpt-3.5-turbo" name="model" value="gpt-3.5-turbo" checked>
             <label for="model_gpt-3.5-turbo">gpt-3.5-turbo</label><br>
@@ -85,7 +85,7 @@
             <label for="model_gpt-4-1106-preview">gpt-4-1106-preview (128k)</label><br>
             <input type="radio" id="model_gpt-4-vision-preview" name="model" value="gpt-4-vision-preview">
             <label for="model_gpt-4-vision-preview">gpt-4-vision-preview</label>
-        </p>
+        </fieldset>
         <p>
             <label for="temperature">Temperature</label><br>
             <input type="range" id="temperature" min="0" max="2.0" step="0.1" value="0.5">
@@ -102,22 +102,22 @@
             ( https://platform.openai.com/docs/api-reference/chat/create#chat-create-seed )
         </p>
         -->
-        <p>
-            <label>User role</label><br>
+        <fieldset>
+            <legend>User role</legend>
             <input type="radio" id="user" name="user_role" value="user" checked>
             <label for="user">User</label><br>
             <input type="radio" id="system" name="user_role" value="system">
             <label for="system">System</label><br>
             <input type="radio" id="assistant" name="user_role" value="assistant">
             <label for="assistant">Assistant</label>
-        </p>
+        </fieldset>
         <p>
             <label for="endpoint">API Endpoint</label><br>
             <input type="text" id="endpoint" value="https://api.openai.com/v1/chat/completions">
         </p>
         <p>
             <div id="session">
-                <label>Session (API key)</label><br>
+                <span>Session (API key)</span><br>
                 <div id="session-login">
                     <label for="login-btn">Login</label>
                     <button id="login-btn" title="Login" class="toolbtn">
