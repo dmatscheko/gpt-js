@@ -10,7 +10,6 @@ html, body {
 #col-container {
     display: flex;
     flex-direction: column;
-    /* height: 100vh; */
     height: 100%;
     max-width: 75%;
     margin-left: auto;
@@ -29,7 +28,7 @@ html, body {
 
 #chat-container {
     flex: 1;
-    padding: 10px 0px;
+    padding: 10px 0;
     overflow-y: overlay;
 }
 
@@ -44,7 +43,6 @@ html, body {
 }
 
 #input-container textarea {
-    /* #message-inp */
     width: 100%;
     resize: none;
     border: 1px solid #20212280;
@@ -64,7 +62,7 @@ html, body {
     color: #fff;
     border: none;
     padding: 2px;
-    margin: 1px 0px;
+    margin: 1px 0;
     border-radius: 4px;
     width: 35px;
     height: 29px;
@@ -74,8 +72,8 @@ html, body {
 .toolbtn.small {
     background-color: #40424f60;
     border-radius: 4px;
-    padding: 0px;
-    margin: 0px;
+    padding: 0;
+    margin: 0;
     width: 26px;
     height: 16px;
 }
@@ -125,7 +123,7 @@ a:hover {
 }
 
 #settings p {
-    margin: 8px 0px;
+    margin: 8px 0;
 }
 
 /* Chat flow */
@@ -138,29 +136,29 @@ a:hover {
     overflow-wrap: break-word;
 }
 
-#chat>.message {
+#chat > .message {
     margin: 8px;
-    margin-bottom: 0px;
+    margin-bottom: 0;
     padding: 8px;
     border-radius: 16px;
 }
 
-#chat>.ping {
+#chat > .ping {
     background-color: #383333;
     margin-left: 40px;
-    margin-right: 0px;
-    border-bottom-right-radius: 0px;
+    margin-right: 0;
+    border-bottom-right-radius: 0;
 }
 
-#chat>.pong {
+#chat > .pong {
     background-color: #333338;
-    margin-left: 0px;
+    margin-left: 0;
     margin-right: 40px;
-    border-bottom-left-radius: 0px;
+    border-bottom-left-radius: 0;
     margin-bottom: 8px;
 }
 
-#chat>.system {
+#chat > .system {
     background-color: #583333;
 }
 
@@ -179,14 +177,14 @@ a:hover {
 }
 
 #chat pre {
-    margin: .3em 0px;
+    margin: .3em 0;
     white-space: pre-wrap;
 }
 
 #chat table {
     width: 100%;
     border-collapse: separate;
-    border-spacing: 0px;
+    border-spacing: 0;
     border-right: 1px solid #d9d9e2;
     border-bottom: 1px solid #d9d9e2;
     border-radius: 5px;
@@ -225,7 +223,7 @@ a:hover {
 
 #chat .katex-html {
     display: none;
-    font-size: 0px;
+    font-size: 0;
 }
 
 #chat .katex-error {
@@ -293,8 +291,6 @@ a:hover {
 
 /* On mobile */
 @media only screen and (max-width: 1037px) {
-
-    /* 767px */
     .only-desktop {
         display: none;
     }
@@ -306,8 +302,6 @@ a:hover {
 
 /* On desktop */
 @media only screen and (min-width: 1038px) {
-
-    /* 768px */
     .only-mobile {
         display: none;
     }
@@ -316,28 +310,35 @@ a:hover {
 /* Print */
 @media print {
     html, body {
-        background-color: #ffffffff;
+        background-color: #fff;
     }
+
     #chat-container {
         overflow: visible;
     }
+
     #input-container, #header, #buttons, #settings, #spacer-bottom, #source {
         display: none;
     }
+
     #col-container {
         max-width: 100%;
         width: 100%;
     }
+
     .clip-badge-copy-icon, button {
         display: none;
     }
-    #chat>.ping {
+
+    #chat > .ping {
         border: 1px solid #383333;
     }
-    #chat>.pong {
+
+    #chat > .pong {
         border: 1px solid #333338;
-    }    
-    #chat>.system {
+    }
+
+    #chat > .system {
         border: 1px solid #583333;
     }
 }

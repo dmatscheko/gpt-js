@@ -1,19 +1,15 @@
+'use strict';
+
 (function (globals) {
-    'use strict';
 
-
-    // Interact with OpenAI API
+    // Fetches a chat completion from OpenAI API with streaming.
     async function openaiChat(message, chatlog, model, temperature, top_p, user_role, ui) {
         if (!regenerateLastAnswer && !message) return;
         if (receiving) return;
         receiving = true;
 
         if (user_role === 'assistant') {
-            const prompt_msg = {
-                role: user_role,
-                content: message
-            };
-            chatlog.addMessage(prompt_msg);
+            chatlog.addMessage({ role: user_role, content: message });
             ui.chatlogEl.update();
             receiving = false;
             return;
@@ -24,25 +20,20 @@
         try {
             if (!regenerateLastAnswer) {
                 message = message.trim();
-                const prompt_msg = {
-                    role: user_role,
-                    content: message
-                };
-                chatlog.addMessage(prompt_msg);
+                chatlog.addMessage({ role: user_role, content: message });
                 chatlog.addMessage(null);
             }
             regenerateLastAnswer = false;
             ui.chatlogEl.update();
-            // chatlog.getFirstMessage().value.content = first_prompt + getDatePrompt();
+
             const payload = {
                 model,
                 messages: chatlog.getActiveMessageValues(),
                 temperature,
                 top_p,
-                stream: true,
+                stream: true
             };
 
-            // do not send initial prompt without other messages
             if (payload.messages.length <= 1) return;
 
             const response = await fetch(ui.endpointEl.value, {
@@ -54,25 +45,31 @@
                 },
                 body: JSON.stringify(payload)
             });
+
+            if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+
             const reader = response.body.getReader();
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                const value_str = new TextDecoder().decode(value);
-                if (value_str.startsWith('{')) {
-                    const data = JSON.parse(value_str);
-                    if ('error' in data) throw new Error(data.error.message);
+                const valueStr = new TextDecoder().decode(value);
+                if (valueStr.startsWith('{')) {
+                    const data = JSON.parse(valueStr);
+                    if (data.error) throw new Error(data.error.message);
                 }
-                const chunks = value_str.split('\n');
+                const chunks = valueStr.split('\n');
                 let content = '';
                 chunks.forEach(chunk => {
-                    if (chunk.startsWith('data: ')) chunk = chunk.substring(6)
+                    if (!chunk.startsWith('data: ')) return;
+                    chunk = chunk.substring(6);
                     if (chunk === '' || chunk === '[DONE]') return;
                     const data = JSON.parse(chunk);
-                    if ('error' in data) throw new Error(data.error.message);
+                    if (data.error) throw new Error(data.error.message);
                     content += data.choices[0].delta.content || '';
                 });
-                
+
+                if (content === '') continue;
+
                 if (!entryCreated) {
                     const lastMessage = chatlog.addMessage({ role: 'assistant', content });
                     entryCreated = true;
@@ -85,18 +82,18 @@
                 ui.chatlogEl.update();
             }
         } catch (error) {
-            console.error(error);
-            if (('' + error).startsWith('AbortError: ')) {
+            console.error('OpenAI chat error:', error);
+            if (error.name === 'AbortError') {
                 controller = new AbortController();
                 return;
             }
-            if (('' + error).startsWith("Error: You didn't provide an API key.") || ('' + error).startsWith('Error: Incorrect API key provided:')) {
+            if (error.message.includes('API key')) {
                 ui.settingsEl.classList.add('open');
                 setTimeout(() => ui.api_key.focus(), 100);
             }
 
             if (!entryCreated) {
-                chatlog.addMessage({ role: 'assistant', content: '' + error });
+                chatlog.addMessage({ role: 'assistant', content: `${error}` });
                 entryCreated = true;
             } else {
                 chatlog.getLastMessage().value.content += `\n\n${error}`;
@@ -105,50 +102,44 @@
             receiving = false;
             ui.submitBtn.innerHTML = message_submit;
             if (entryCreated) {
-                chatlog.getLastMessage().metadata = { model, temperature, top_p };
+                const lastMessage = chatlog.getLastMessage();
+                lastMessage.metadata = { model, temperature, top_p };
             }
-
             ui.chatlogEl.update();
         }
     }
 
-
-    // Returns the current date and time as prompt part
+    // Generates a prompt suffix with current date and time.
     globals.getDatePrompt = () => {
         const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const datePrompt = `\nKnowledge cutoff: none\nCurrent date: ${year}-${month}-${day}\nCurrent time: ${hours}:${minutes}`;
-        return datePrompt;
-    }
+        return `\n\nKnowledge cutoff: none\nCurrent date: ${now.toISOString().slice(0, 10)}\nCurrent time: ${now.toTimeString().slice(0, 5)}`;
+    };
 
-    globals.loadModels = function(ui) {
-        const endpoint = ui.endpointEl.value;
-        let modelsUrl = endpoint.replace(/\/chat\/completions$/, '/models');
-        fetch(modelsUrl, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${globals.api_key}`
-            }
-        }).then(resp => {
-            if (!resp.ok) throw new Error('Failed to fetch models: ' + resp.statusText);
-            return resp.json();
-        }).then(data => {
-            let models = data.data || [];
-            models = models.sort((a, b) => a.id.localeCompare(b.id));
+    // Loads available models from the API.
+    globals.loadModels = async (ui) => {
+        const modelsUrl = ui.endpointEl.value.replace(/\/chat\/completions$/, '/models');
+        try {
+            const resp = await fetch(modelsUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${globals.api_key}`
+                }
+            });
+            if (!resp.ok) throw new Error(resp.statusText);
+            const data = await resp.json();
+            let models = (data.data || []).sort((a, b) => a.id.localeCompare(b.id));
             const fieldset = document.getElementById('models-fieldset');
-            const toRemove = fieldset.querySelectorAll('input[type="radio"][name="model"], label[for^="model_"], br');
-            toRemove.forEach(el => el.remove());
-            if (models.length === 0) {
+            fieldset.querySelectorAll('input[type="radio"][name="model"], label[for^="model_"], br').forEach(el => el.remove());
+
+            if (!models.length) {
                 const p = document.createElement('p');
                 p.textContent = 'No models available.';
                 fieldset.appendChild(p);
+                return;
             }
-            models.forEach((model) => {
+
+            models.forEach(model => {
                 const safeId = model.id.replace(/[^a-z0-9_-]/gi, '_');
                 const input = document.createElement('input');
                 input.type = 'radio';
@@ -156,20 +147,21 @@
                 input.value = model.id;
                 input.id = `model_${safeId}`;
                 const label = document.createElement('label');
-                label.setAttribute('for', `model_${safeId}`);
+                label.htmlFor = `model_${safeId}`;
                 label.textContent = model.id;
                 fieldset.appendChild(input);
                 fieldset.appendChild(label);
                 fieldset.appendChild(document.createElement('br'));
             });
-            // Add custom model option
+
+            // Custom model input.
             const customInput = document.createElement('input');
             customInput.type = 'radio';
             customInput.name = 'model';
             customInput.value = 'custom';
             customInput.id = 'model_custom';
             const customLabel = document.createElement('label');
-            customLabel.setAttribute('for', 'model_custom');
+            customLabel.htmlFor = 'model_custom';
             customLabel.textContent = 'Custom: ';
             const customText = document.createElement('input');
             customText.type = 'text';
@@ -179,52 +171,37 @@
             fieldset.appendChild(customInput);
             fieldset.appendChild(customLabel);
             fieldset.appendChild(document.createElement('br'));
-            // Set stored model
-            try {
-                const storedModel = localStorage.getItem('model');
-                if (storedModel) {
-                    let found = false;
-                    const radios = fieldset.querySelectorAll('input[name="model"]');
-                    for (const radio of radios) {
-                        if (radio.value === storedModel) {
-                            radio.checked = true;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) {
-                        customInput.checked = true;
-                        customText.value = storedModel;
-                    }
-                } else {
-                    const defaultRadio = fieldset.querySelector('input[value="gpt-3.5-turbo"]') || fieldset.querySelector('input[name="model"]');
-                    if (defaultRadio) defaultRadio.checked = true;
+
+            // Restore selected model.
+            const storedModel = localStorage.getItem('model');
+            if (storedModel) {
+                let radio = fieldset.querySelector(`input[value="${storedModel}"]`);
+                if (radio) radio.checked = true;
+                else {
+                    customInput.checked = true;
+                    customText.value = storedModel;
                 }
-            } catch (error) {
-                console.error(error);
+            } else {
+                const defaultRadio = fieldset.querySelector('input[value="gpt-3.5-turbo"]') || fieldset.querySelector('input[name="model"]');
+                if (defaultRadio) defaultRadio.checked = true;
             }
-        }).catch(err => {
-            console.error(err);
-            alert('Failed to load models: ' + err.message);
-        });
-    }
+        } catch (err) {
+            console.error('Failed to load models:', err);
+            alert(`Failed to load models: ${err.message}`);
+        }
+    };
 
-    // Sets up event listeners for the chat interface
-    // ChatApp.prototype.setUpEventListeners = () => {
+    // Sets up all event listeners for the UI.
     globals.setUpEventListeners = (chatlog, ui) => {
-
         ui.submitBtn.addEventListener('click', () => {
             if (receiving) {
                 controller.abort();
                 return;
             }
-            let model = document.querySelector('input[name="model"]:checked').value;
+            let model = document.querySelector('input[name="model"]:checked')?.value;
             if (model === 'custom') {
                 model = document.getElementById('custom_model').value.trim();
-                if (!model) {
-                    alert('Please enter a custom model ID.');
-                    return;
-                }
+                if (!model) return alert('Please enter a custom model ID.');
             }
             openaiChat(ui.messageEl.value, chatlog, model, Number(ui.temperatureEl.value), Number(ui.topPEl.value), document.querySelector('input[name="user_role"]:checked').value, ui);
             document.getElementById('user').checked = true;
@@ -232,7 +209,7 @@
             ui.messageEl.style.height = 'auto';
         });
 
-        ui.messageEl.addEventListener('keydown', (event) => {
+        ui.messageEl.addEventListener('keydown', event => {
             if (event.keyCode === 13 && (event.shiftKey || event.ctrlKey || event.altKey)) {
                 event.preventDefault();
                 ui.submitBtn.click();
@@ -251,17 +228,12 @@
             if (height > this.clientHeight) this.style.height = `${height}px`;
         });
 
-        document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape') {
-                controller.abort();
-            }
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') controller.abort();
         });
 
         ui.newChatBtn.addEventListener('click', () => {
-            if (receiving) {
-                controller.abort();
-                return;
-            }
+            if (receiving) controller.abort();
             ui.messageEl.value = start_message;
             ui.messageEl.style.height = 'auto';
             chatlog.rootAlternatives = null;
@@ -276,7 +248,6 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = 'chatlog.json';
-            a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -286,106 +257,56 @@
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'application/json';
-            input.style.display = 'none';
-            document.body.appendChild(input);
-
             input.addEventListener('change', () => {
                 const file = input.files[0];
                 const reader = new FileReader();
-
                 reader.addEventListener('load', () => {
-                    const jsonData = reader.result;
-                    const data = JSON.parse(jsonData);
+                    const data = JSON.parse(reader.result);
                     chatlog.load(data.rootAlternatives);
                     ui.chatlogEl.update();
                 });
-
                 reader.readAsText(file);
-                document.body.removeChild(input);
             });
-
             input.click();
         });
 
         ui.temperatureValueEl.textContent = ui.temperatureEl.value;
-        ui.temperatureEl.addEventListener('input', () => {
-            ui.temperatureValueEl.textContent = ui.temperatureEl.value;
-        });
+        ui.temperatureEl.addEventListener('input', () => ui.temperatureValueEl.textContent = ui.temperatureEl.value);
 
         ui.topPValueEl.textContent = ui.topPEl.value;
-        ui.topPEl.addEventListener('input', () => {
-            ui.topPValueEl.textContent = ui.topPEl.value;
-        });
+        ui.topPEl.addEventListener('input', () => ui.topPValueEl.textContent = ui.topPEl.value);
 
-        ui.endpointEl.addEventListener('input', () => {
-            try {
-                localStorage.setItem('endpoint', ui.endpointEl.value);
-            } catch (error) {
-                console.error(error);
-            }
-        });
+        ui.endpointEl.addEventListener('input', () => localStorage.setItem('endpoint', ui.endpointEl.value));
 
-        ui.settingsBtn.addEventListener('click', () => {
-            ui.settingsEl.classList.toggle('open');
-        });
+        ui.settingsBtn.addEventListener('click', () => ui.settingsEl.classList.toggle('open'));
 
         ui.api_key.addEventListener('input', () => {
-            try {
-                localStorage.api_key = ui.api_key.value;
-                globals.api_key = ui.api_key.value;
-            } catch (error) {
-                console.error(error);
-            }
+            localStorage.api_key = ui.api_key.value;
+            globals.api_key = ui.api_key.value;
         });
 
         ui.clear_api_key_btn.addEventListener('click', () => {
-            try {
-                localStorage.removeItem('api_key');
-                globals.api_key = '';
-                ui.api_key.value = '';
-            } catch (error) {
-                console.error(error);
-            }
+            localStorage.removeItem('api_key');
+            globals.api_key = '';
+            ui.api_key.value = '';
         });
 
-        ui.refreshModelsBtn = document.getElementById('refresh-models-btn');
-        ui.refreshModelsBtn.addEventListener('click', () => globals.loadModels(ui));
+        document.getElementById('refresh-models-btn').addEventListener('click', () => globals.loadModels(ui));
 
-        // Save selected model on change
+        // Save model selection.
         const saveModel = () => {
             let model = document.querySelector('input[name="model"]:checked')?.value;
-            if (model === 'custom') {
-                model = document.getElementById('custom_model')?.value.trim();
-            }
-            if (model) {
-                localStorage.setItem('model', model);
-            }
+            if (model === 'custom') model = document.getElementById('custom_model')?.value.trim();
+            if (model) localStorage.setItem('model', model);
         };
-
         document.getElementById('models-fieldset').addEventListener('change', saveModel);
-
-        const customText = document.getElementById('custom_model');
-        if (customText) {
-            customText.addEventListener('input', () => {
-                if (document.getElementById('model_custom')?.checked) {
-                    saveModel();
-                }
-            });
-        }
-
-    }
-
+        document.getElementById('custom_model')?.addEventListener('input', () => {
+            if (document.getElementById('model_custom')?.checked) saveModel();
+        });
+    };
 
     globals.getApiKey = () => {
-        try {
-            globals.api_key = localStorage.api_key;
-        } catch (error) {
-            console.error(error);
-        }
-        if (typeof globals.api_key === 'undefined') {
-            globals.api_key = '';
-        }
-    }
-
+        globals.api_key = localStorage.api_key || '';
+    };
 
 }(this));

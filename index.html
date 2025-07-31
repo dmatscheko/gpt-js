@@ -30,13 +30,12 @@
         </div>
         <div id="spacer-bottom" class="only-mobile"></div>
     </div>
-    
     <div id="source"><small><a href="https://github.com/dmatscheko/gpt-js" target="_blank">github src</a></small></div>
     <div id="buttons">
         <button id="settings-btn" title="Settings" class="toolbtn">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
-                    d="M12 4a1 1 0 0 0-1 1c0 1.692-2.046 2.54-3.243 1.343a1 1 0 1 0-1.414 1.414C7.54 8.954 6.693 11 5 11a1 1 0 1 0 0 2c1.692 0 2.54 2.046 1.343 3.243a1 1 0 0 0 1.414 1.414C8.954 16.46 11 17.307 11 19a1 1 0 1 0 2 0c0-1.692 2.046-2.54 3.243-1.343a1 1 0 1 0 1.414-1.414C16.46 15.046 17.307 13 19 13a1 1 0 1 0 0-2c-1.692 0-2.54-2.046-1.343-3.243a1 1 0 0 0-1.414-1.414C15.046 7.54 13 6.693 13 5a1 1 0 0 0-1-1zm-2.992.777a3 3 0 0 1 5.984 0 3 3 0 0 1 4.23 4.231 3 3 0 0 1 .001 5.984 3 3 0 0 1-4.231 4.23 3 3 0 0 1-5.984 0 3 3 0 0 1-4.231-4.23 3 3 0 0 1 0-5.984 3 3 0 0 1 4.231-4.231z"
+                    d="M12 4a1 1 0 0 0-1 1c0 1.692-2.046 2.54-3.243 1.343a1 1 0 1 0-1.414 1.414C7.54 8.954 6.693 11 5 11a1 1 0 1 0 0 2c1.692 0 2.54 2.046 1.343 3.243a1 1 0 0 0 1.414 1.414C8.954 16.46 11 17.307 11 19a1 1 0 1 0 2 0c0-1.692 2.046-2.54 3.243-1.343a1 1 0 0 0 1.414-1.414C16.46 15.046 17.307 13 19 13a1 1 0 1 0 0-2c-1.692 0-2.54-2.046-1.343-3.243a1 1 0 0 0-1.414-1.414C15.046 7.54 13 6.693 13 5a1 1 0 0 0-1-1zm-2.992.777a3 3 0 0 1 5.984 0 3 3 0 0 1 4.23 4.231 3 3 0 0 1 .001 5.984 3 3 0 0 1-4.231 4.23 3 3 0 0 1-5.984 0 3 3 0 0 1-4.231-4.23 3 3 0 0 1 0-5.984 3 3 0 0 1 4.231-4.231z"
                     fill="currentColor" />
                 <path
                     d="M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-2.828-.828a4 4 0 1 1 5.656 5.656 4 4 0 0 1-5.656-5.656z"
@@ -71,19 +70,6 @@
     <div id="settings">
         <fieldset id="models-fieldset">
             <legend>Model&nbsp;<button id="refresh-models-btn" title="Refresh models" class="toolbtn small"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" fill="currentColor"/></svg></button></legend>
-            <input type="radio" id="model_gpt-3.5-turbo" name="model" value="gpt-3.5-turbo" checked>
-            <label for="model_gpt-3.5-turbo">gpt-3.5-turbo</label><br>
-            <input type="radio" id="model_gpt-3.5-turbo-16k" name="model" value="gpt-3.5-turbo-16k">
-            <label for="model_gpt-3.5-turbo-16k">gpt-3.5-turbo-16k</label><br>
-
-            <input type="radio" id="model_gpt-4" name="model" value="gpt-4">
-            <label for="model_gpt-4">gpt-4</label><br>
-            <input type="radio" id="model_gpt-4-32k" name="model" value="gpt-4-32k">
-            <label for="model_gpt-4-32k">gpt-4-32k</label><br>
-            <input type="radio" id="model_gpt-4-1106-preview" name="model" value="gpt-4-1106-preview">
-            <label for="model_gpt-4-1106-preview">gpt-4-1106-preview (128k)</label><br>
-            <input type="radio" id="model_gpt-4-vision-preview" name="model" value="gpt-4-vision-preview">
-            <label for="model_gpt-4-vision-preview">gpt-4-vision-preview</label>
         </fieldset>
         <p>
             <label for="temperature">Temperature</label><br>
@@ -91,7 +77,7 @@
             <span id="temperature-value"></span>
         </p>
         <p>
-            <label for="top_p">Top-p (nucleus sampling)&nbsp;&nbsp;</label><br> <!-- &nbsp;&nbsp; to make room for longer top_p-values -->
+            <label for="top_p">Top-p (nucleus sampling)&nbsp;&nbsp;</label><br>
             <input type="range" id="top_p" min="0" max="1.0" step="0.05" value="1.0">
             <span id="top_p-value"></span>
         </p>

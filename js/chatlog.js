@@ -1,6 +1,5 @@
 'use strict';
 
-
 class Message {
     constructor(value) {
         this.value = value;
@@ -10,17 +9,18 @@ class Message {
     }
 
     getAnswerMessage() {
-        if (this.answerAlternatives === null) return null;
-        return this.answerAlternatives.getActiveMessage();
+        return this.answerAlternatives ? this.answerAlternatives.getActiveMessage() : null;
     }
 
     toJSON() {
-        return { value: this.value, metadata: this.metadata, answerAlternatives: this.answerAlternatives };
+        return {
+            value: this.value,
+            metadata: this.metadata,
+            answerAlternatives: this.answerAlternatives
+        };
     }
 }
 
-
-// Alternatives of a message at one position in the tree
 class Alternatives {
     constructor() {
         this.messages = [];
@@ -29,7 +29,7 @@ class Alternatives {
 
     addMessage(value) {
         const current = this.getActiveMessage();
-        if (current !== null && current.value === null) {
+        if (current && current.value === null) {
             current.value = value;
             return current;
         }
@@ -40,48 +40,39 @@ class Alternatives {
     }
 
     setActiveMessage(value) {
-        const index = this.messages.findIndex((element) => element.value === value);
-        if (index !== -1) {
-            this.activeMessageIndex = index;
-        }
+        const index = this.messages.findIndex(msg => msg.value === value);
+        if (index !== -1) this.activeMessageIndex = index;
     }
 
     getActiveMessage() {
-        if (this.activeMessageIndex === -1) return null;
-        return this.messages[this.activeMessageIndex] || null;
+        return this.activeMessageIndex !== -1 ? this.messages[this.activeMessageIndex] || null : null;
     }
 
     next() {
         if (this.activeMessageIndex === -1) return null;
-        if (this.messages[this.activeMessageIndex] === null || this.messages[this.activeMessageIndex].value === null) {
+        if (!this.messages[this.activeMessageIndex] || this.messages[this.activeMessageIndex].value === null) {
             this.messages.splice(this.activeMessageIndex, 1);
             this.clearCache();
         }
-        this.activeMessageIndex++;
-        if (this.activeMessageIndex > this.messages.length - 1) this.activeMessageIndex = 0;
+        this.activeMessageIndex = (this.activeMessageIndex + 1) % this.messages.length;
         return this.messages[this.activeMessageIndex];
     }
 
     prev() {
         if (this.activeMessageIndex === -1) return null;
-        if (this.messages[this.activeMessageIndex] === null || this.messages[this.activeMessageIndex].value === null) {
+        if (!this.messages[this.activeMessageIndex] || this.messages[this.activeMessageIndex].value === null) {
             this.messages.splice(this.activeMessageIndex, 1);
             this.clearCache();
         }
-        this.activeMessageIndex--;
-        if (this.activeMessageIndex < 0) this.activeMessageIndex = this.messages.length - 1;
+        this.activeMessageIndex = (this.activeMessageIndex - 1 + this.messages.length) % this.messages.length;
         return this.messages[this.activeMessageIndex];
     }
 
     clearCache() {
-        for (const msg of this.messages) {
-            if (msg !== null && msg !== undefined) msg.cache = null;
-        }
+        this.messages.forEach(msg => { if (msg) msg.cache = null; });
     }
 }
 
-
-// Chatlog is a whole tree of messages
 class Chatlog {
     constructor() {
         this.rootAlternatives = null;
@@ -89,7 +80,7 @@ class Chatlog {
 
     addMessage(value) {
         const lastMessage = this.getLastMessage();
-        if (lastMessage === null) {
+        if (!lastMessage) {
             this.rootAlternatives = new Alternatives();
             return this.rootAlternatives.addMessage(value);
         }
@@ -102,31 +93,26 @@ class Chatlog {
     }
 
     getFirstMessage() {
-        if (this.rootAlternatives === null) return null;
-        return this.rootAlternatives.getActiveMessage();
+        return this.rootAlternatives ? this.rootAlternatives.getActiveMessage() : null;
     }
 
     getLastMessage() {
         const lastAlternatives = this.getLastAlternatives();
-        if (lastAlternatives === null) return null;
-        return lastAlternatives.getActiveMessage();
+        return lastAlternatives ? lastAlternatives.getActiveMessage() : null;
     }
 
     getNthMessage(n) {
-        n = parseInt(n);
-        let alternative = getNthAlternatives(n);
-        if (alternative === null) return null;
-        return alternative.getActiveMessage();
+        const alternatives = this.getNthAlternatives(parseInt(n));
+        return alternatives ? alternatives.getActiveMessage() : null;
     }
 
     getNthAlternatives(n) {
-        n = parseInt(n);
         let pos = 0;
         let current = this.rootAlternatives;
-        while (current !== null) {
+        while (current) {
             if (pos >= n) return current;
             const activeMessage = current.getActiveMessage();
-            if (activeMessage === null || activeMessage.answerAlternatives === null) break;
+            if (!activeMessage || !activeMessage.answerAlternatives) break;
             current = activeMessage.answerAlternatives;
             pos++;
         }
@@ -136,61 +122,44 @@ class Chatlog {
     getLastAlternatives() {
         let current = this.rootAlternatives;
         let last = current;
-        while (current !== null) {
+        while (current) {
             last = current;
             const activeMessage = current.getActiveMessage();
-            if (activeMessage === null || activeMessage.answerAlternatives === null) break;
+            if (!activeMessage || !activeMessage.answerAlternatives) break;
             current = activeMessage.answerAlternatives;
         }
         return last;
     }
 
-    // getActiveMessages() {
-    //     let result = [];
-    //     // Trace the active path through the chatlog
-    //     let message = this.getFirstMessage();
-    //     while (message !== null) {
-    //         result.push(message);
-    //         if (message.value === null) break;
-    //         message = message.getAnswerMessage();
-    //     }
-    //     return result;
-    // }
-
     getActiveMessageValues() {
-        let result = [];
-        // Trace the active path through the chatlog
+        const result = [];
         let message = this.getFirstMessage();
-        while (message !== null && message.value !== null) {
+        while (message && message.value) {
             result.push(message.value);
             message = message.getAnswerMessage();
         }
         return result;
     }
 
-    load(alternative) {
-        let msgcount = 0;
-        const buildAlternatives = (parsedAlt) => {
-            if (!parsedAlt) return null;
-
+    load(alternativesData) {
+        let msgCount = 0;
+        const buildAlternatives = (data) => {
+            if (!data) return null;
             const alt = new Alternatives();
-            alt.activeMessageIndex = parsedAlt.activeMessageIndex;
-
-            for (const parsedMessage of parsedAlt.messages) {
-                const msg = new Message(parsedMessage.value);
-                msg.metadata = parsedMessage.metadata;
-                msg.answerAlternatives = buildAlternatives(parsedMessage.answerAlternatives);
+            alt.activeMessageIndex = data.activeMessageIndex;
+            data.messages.forEach(parsedMsg => {
+                const msg = new Message(parsedMsg.value);
+                msg.metadata = parsedMsg.metadata;
+                msg.answerAlternatives = buildAlternatives(parsedMsg.answerAlternatives);
                 alt.messages.push(msg);
-                msgcount++;
-            }
-
+                msgCount++;
+            });
             return alt;
         };
-
-        this.rootAlternatives = buildAlternatives(alternative);
+        this.rootAlternatives = buildAlternatives(alternativesData);
     }
 
     clearCache() {
-        this.load(this.rootAlternatives);
+        this.load(this.rootAlternatives);  // Rebuild to clear caches.
     }
 }

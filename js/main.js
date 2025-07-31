@@ -1,6 +1,6 @@
-(function (globals) {
-    'use strict';
+'use strict';
 
+(function (globals) {
 
     document.addEventListener('DOMContentLoaded', () => {
         const chatlog = new Chatlog();
@@ -22,11 +22,8 @@
             clear_api_key_btn: document.getElementById('clear_api_key-btn')
         };
 
-        // Set up event listeners and initialize chat
-        setUpEventListeners(chatlog, ui);
-
-        // Get API key
         getApiKey();
+        setUpEventListeners(chatlog, ui);
 
         ui.api_key.value = globals.api_key || '';
         if (!globals.api_key) {
@@ -34,7 +31,7 @@
             setTimeout(() => ui.api_key.focus(), 100);
         }
 
-        // Load old chat
+        // Load persisted chatlog.
         const storedChatlog = localStorage.getItem('chatlog');
         if (storedChatlog) {
             try {
@@ -42,29 +39,17 @@
                 chatlog.load(data.rootAlternatives);
                 ui.chatlogEl.update();
             } catch (error) {
-                console.error(error);
+                console.error('Failed to load stored chatlog:', error);
             }
         }
 
-        // Load endpoint from localStorage
-        try {
-            const storedEndpoint = localStorage.getItem('endpoint');
-            if (storedEndpoint) {
-                ui.endpointEl.value = storedEndpoint;
-            }
-        } catch (error) {
-            console.error(error);
-        }
+        // Load endpoint.
+        const storedEndpoint = localStorage.getItem('endpoint');
+        if (storedEndpoint) ui.endpointEl.value = storedEndpoint;
 
-        if (globals.api_key) {
-            globals.loadModels(ui);
-        }
+        if (globals.api_key) loadModels(ui);
 
-        if (chatlog.rootAlternatives == null) {
-            // Start new chat, if no old chat could be loaded
-            ui.newChatBtn.click();
-        }
+        if (!chatlog.rootAlternatives) ui.newChatBtn.click();
     });
-
 
 }(this));

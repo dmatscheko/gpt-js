@@ -2,7 +2,7 @@
 
 // TODO: Maybe add token count and answer price to the title.
 
-// Chatbox display the currently selected message path through a Chatlog
+// Displays the currently selected message path through a Chatlog
 class Chatbox {
     constructor(chatlog, container) {
         this.chatlog = chatlog;
@@ -12,22 +12,19 @@ class Chatbox {
 
     // Updates the HTML inside the chat window
     update(scroll = true) {
-        const should_scroll_down = scroll &&
-            (this.container.parentElement.scrollHeight - this.container.parentElement.clientHeight <=
-                this.container.parentElement.scrollTop + 5);
+        const shouldScrollDown = scroll && this.#isScrolledToBottom();
 
         const fragment = document.createDocumentFragment();
-
-        // Show the active path through the chatlog
         let alternative = this.chatlog.rootAlternatives;
         let lastRole = 'assistant';
         let pos = 0;
-        while (true) {
-            if (alternative == null) break;
-            let message = alternative.getActiveMessage();
-            if (message === null) break;
 
-            if (message.cache !== null) {
+        // Traverse the active path through the chatlog
+        while (alternative) {
+            const message = alternative.getActiveMessage();
+            if (!message) break;
+
+            if (message.cache) {
                 fragment.appendChild(message.cache);
                 lastRole = message.value.role;
                 alternative = message.answerAlternatives;
@@ -38,9 +35,8 @@ class Chatbox {
             const msgIdx = alternative.activeMessageIndex;
             const msgCnt = alternative.messages.length;
 
-            if (message.value === null) {
-                let role = 'assistant';
-                if (lastRole === 'assistant') role = 'user';
+            if (!message.value) {
+                const role = lastRole === 'assistant' ? 'user' : 'assistant';
                 const messageEl = this.#formatMessage({ value: { role, content: '🤔...' } }, pos, msgIdx, msgCnt);
                 fragment.appendChild(messageEl);
                 break;
@@ -63,26 +59,32 @@ class Chatbox {
 
         this.container.replaceChildren(fragment);
 
-        if (should_scroll_down) {
+        if (shouldScrollDown) {
             this.container.parentElement.scrollTop = this.container.parentElement.scrollHeight;
         }
 
+        this.#persistChatlog();
+    }
+
+    #isScrolledToBottom() {
+        const { scrollHeight, clientHeight, scrollTop } = this.container.parentElement;
+        return scrollHeight - clientHeight <= scrollTop + 5;
+    }
+
+    #persistChatlog() {
         try {
             localStorage.chatlog = JSON.stringify(this.chatlog);
         } catch (error) {
-            console.error(error);
+            console.error('Failed to persist chatlog:', error);
         }
     }
 
-    // Formats one message as HTML
+    // Formats a single message as HTML.
     #formatMessage(message, pos, msgIdx, msgCnt) {
         let type = 'ping';
         if (message.value.role === 'assistant') type = 'pong';
         const el = document.createElement('div');
-        el.classList.add('message');
-        el.classList.add(type);
-        el.classList.add('hljs-nobg');
-        el.classList.add('hljs-message');
+        el.classList.add('message', type, 'hljs-nobg', 'hljs-message');
         if (message.value.role === 'system') el.classList.add('system');
         el.dataset.plaintext = encodeURIComponent(message.value.content.trim());
         el.dataset.pos = pos;
@@ -90,54 +92,61 @@ class Chatbox {
         el.appendChild(this.#getAvatar(type));
 
         let msgStat = '';
-        if (msgIdx > 0 || msgCnt > 1) msgStat = `<button title="Previous Message" class="msg_mod-prev-btn toolbtn small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 7.766c0-1.554-1.696-2.515-3.029-1.715l-7.056 4.234c-1.295.777-1.295 2.653 0 3.43l7.056 4.234c1.333.8 3.029-.16 3.029-1.715V7.766zM9.944 12L17 7.766v8.468L9.944 12zM6 6a1 1 0 0 1 1 1v10a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;${msgIdx + 1}/${msgCnt}&nbsp;<button title="Next Message" class="msg_mod-next-btn toolbtn small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 7.766c0-1.554 1.696-2.515 3.029-1.715l7.056 4.234c1.295.777 1.295 2.653 0 3.43L8.03 17.949c-1.333.8-3.029-.16-3.029-1.715V7.766zM14.056 12L7 7.766v8.468L14.056 12zM18 6a1 1 0 0 1 1 1v10a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;&nbsp;`;
+        if (msgIdx > 0 || msgCnt > 1) {
+            msgStat = `<button title="Previous Message" class="msg_mod-prev-btn toolbtn small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 7.766c0-1.554-1.696-2.515-3.029-1.715l-7.056 4.234c-1.295.777-1.295 2.653 0 3.43l7.056 4.234c1.333.8 3.029-.16 3.029-1.715V7.766zM9.944 12L17 7.766v8.468L9.944 12zM6 6a1 1 0 0 1 1 1v10a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;${msgIdx + 1}/${msgCnt}&nbsp;<button title="Next Message" class="msg_mod-next-btn toolbtn small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 7.766c0-1.554 1.696-2.515 3.029-1.715l7.056 4.234c1.295.777 1.295 2.653 0 3.43L8.03 17.949c-1.333.8-3.029-.16-3.029-1.715V7.766zM14.056 12L7 7.766v8.468L14.056 12zM18 6a1 1 0 0 1 1 1v10a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;&nbsp;`;
+        }
         let model = '';
-        if (message.metadata && message.metadata.model) {
+        if (message.metadata?.model) {
             model = `&nbsp;<span class="right">${message.metadata.model}</span>`;
         }
         const msgTitleStrip = document.createElement('small');
         msgTitleStrip.innerHTML = `<span class="nobreak"><button title="New Message" class="msg_mod-add-btn toolbtn small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;&nbsp;${msgStat}<b>${message.value.role}</b>${model}</span><br><br>`;
         el.appendChild(msgTitleStrip);
 
-        const formattedEntities = this.#formatCodeBlocks(message.value.content);
-        if (formattedEntities) {
-            el.appendChild(formattedEntities);
+        const formattedContent = this.#formatContent(message.value.content);
+        if (formattedContent) {
+            el.appendChild(formattedContent);
         } else {
             const div = document.createElement('div');
             div.innerHTML = 'Error: Timeout on API server.';
             el.appendChild(div);
         }
 
-        el.getElementsByClassName('msg_mod-add-btn')[0].addEventListener('click', async () => {
+        this.#attachMessageEvents(el, type, pos, message);
+
+        if (msgIdx > 0 || msgCnt > 1) {
+            this.#attachNavigationEvents(el);
+        }
+
+        if (this.clipbadge) {
+            this.#prepareCopyableElements(el);
+            this.clipbadge.addTo(el);
+        }
+
+        return el;
+    }
+
+    #attachMessageEvents(el, type, pos, message) {
+        el.querySelector('.msg_mod-add-btn').addEventListener('click', async () => {
             const messageInp = document.getElementById('message-inp');
             let newMessage = null;
             if (type === 'ping') {
                 if (pos === 0) {
-                    // messageInp.value = first_prompt + getDatePrompt();
                     newMessage = { role: 'system', content: first_prompt + getDatePrompt() };
                 } else {
-                    if (messageInp.value === '') {
-                            messageInp.value = message.value.content.trim();
-                            messageInp.dispatchEvent(new Event('input', { bubbles: true }));
-                            if (message.value.role === 'system') {
-                                document.getElementById('system').checked = true;
-                            } else {
-                                document.getElementById('user').checked = true;
-                            }
+                    if (!messageInp.value) {
+                        messageInp.value = message.value.content.trim();
+                        messageInp.dispatchEvent(new Event('input', { bubbles: true }));
+                        document.getElementById(message.value.role === 'system' ? 'system' : 'user').checked = true;
                     }
                 }
             }
             const alternative = this.chatlog.getNthAlternatives(pos);
-            if (alternative !== null) alternative.addMessage(newMessage);
+            if (alternative) alternative.addMessage(newMessage);
             this.update(false);
             if (type === 'pong') {
-                // Assistant message
-                if (receiving) {
-                    controller.abort();
-                }
-                // SetTimeout because of race condition with controller.abort(). Probably not the best solution
+                if (receiving) controller.abort();
                 setTimeout(() => {
-                    // Set this globally to true, so that the click on submit can run without a message in the input box
                     regenerateLastAnswer = true;
                     document.getElementById('submit-btn').click();
                 }, 100);
@@ -145,53 +154,33 @@ class Chatbox {
             }
             messageInp.focus();
         });
+    }
 
-        if (msgIdx > 0 || msgCnt > 1) {
-            el.getElementsByClassName('msg_mod-prev-btn')[0].addEventListener('click', () => {
-                this.chatlog.getNthAlternatives(el.dataset.pos).prev();
-                this.update(false);
-            });
+    #attachNavigationEvents(el) {
+        el.querySelector('.msg_mod-prev-btn').addEventListener('click', () => {
+            this.chatlog.getNthAlternatives(el.dataset.pos).prev();
+            this.update(false);
+        });
 
-            el.getElementsByClassName('msg_mod-next-btn')[0].addEventListener('click', () => {
-                this.chatlog.getNthAlternatives(el.dataset.pos).next();
-                this.update(false);
-            });
-        }
-
-        if (this.clipbadge) {
-            this.#prepareTablesAndRemainingSvg(el);
-            this.clipbadge.addTo(el);
-        }
-
-        return el;
+        el.querySelector('.msg_mod-next-btn').addEventListener('click', () => {
+            this.chatlog.getNthAlternatives(el.dataset.pos).next();
+            this.update(false);
+        });
     }
 
     #getAvatar(type) {
         const avatar = document.createElement('img');
-        let avatarSrc = undefined;
-        let avatarFromLocalStorage = false;
-        let canUselocalStorage = true;
-        try {
-            avatarSrc = localStorage.getItem(`${type}Avatar`);
-            avatarFromLocalStorage = avatarSrc !== null;
-        } catch (error) {
-            canUselocalStorage = false;
-            console.error(error);
-        }
+        let avatarSrc = localStorage.getItem(`${type}Avatar`);
+        const isCustom = !!avatarSrc;
         avatar.classList.add('avatar');
-        if (canUselocalStorage) avatar.classList.add('clickable');
-        avatar.src = avatarSrc || 'data:image/svg+xml,' + encodeURIComponent(type === 'ping' ? avatar_ping : avatar_pong);
+        if (localStorage) avatar.classList.add('clickable');
+        avatar.src = avatarSrc || `data:image/svg+xml,${encodeURIComponent(type === 'ping' ? avatar_ping : avatar_pong)}`;
 
         avatar.addEventListener('click', () => {
-            if (!canUselocalStorage) return;
-            if (avatarFromLocalStorage) {
-                const original = 'data:image/svg+xml,' + encodeURIComponent(type === 'ping' ? avatar_ping : avatar_pong);
-                avatar.src = original;
-                try {
-                    localStorage.removeItem(`${type}Avatar`);
-                } catch (error) {
-                    console.error(error);
-                }
+            if (!localStorage) return;
+            if (isCustom) {
+                avatar.src = `data:image/svg+xml,${encodeURIComponent(type === 'ping' ? avatar_ping : avatar_pong)}`;
+                localStorage.removeItem(`${type}Avatar`);
                 this.chatlog.clearCache();
                 this.update(false);
                 return;
@@ -203,11 +192,7 @@ class Chatbox {
                 const file = input.files[0];
                 const reader = new FileReader();
                 reader.addEventListener('load', () => {
-                    try {
-                        localStorage.setItem(`${type}Avatar`, reader.result);
-                    } catch (error) {
-                        console.error(error);
-                    }
+                    localStorage.setItem(`${type}Avatar`, reader.result);
                     avatar.src = reader.result;
                     this.chatlog.clearCache();
                     this.update(false);
@@ -220,57 +205,43 @@ class Chatbox {
         return avatar;
     }
 
-    // TODO: also update SVG 
-    #prepareTablesAndRemainingSvg(parent) {
-        function tableToCSV(table) {
+    // TODO: also update SVG
+    #prepareCopyableElements(parent) {
+        const tableToCSV = (table) => {
             const separator = ';';
             const rows = table.querySelectorAll('tr');
-            const csv = [];
-            for (const rowElement of rows) {
-                const row = [];
-                const cols = rowElement.querySelectorAll('td, th');
-                for (const col of cols) {
-                    let data = col.innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/(\s\s)/gm, ' ');
-                    data = data.replace(/"/g, '""');
-                    row.push(`"${data}"`);
-                }
-                csv.push(row.join(separator));
-            }
-            return csv.join('\n');
-        }
+            return Array.from(rows).map(row => 
+                Array.from(row.querySelectorAll('td, th')).map(col => 
+                    `"${col.innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/(\s\s)/gm, ' ').replace(/"/g, '""')}"`
+                ).join(separator)
+            ).join('\n');
+        };
 
-        const tables = parent.querySelectorAll('table');
-        for (const table of tables) {
+        parent.querySelectorAll('table').forEach(table => {
             const div = document.createElement('div');
-            div.classList.add('hljs-nobg');
-            div.classList.add('hljs-table');
-            div.classList.add('language-table');
+            div.classList.add('hljs-nobg', 'hljs-table', 'language-table');
             div.dataset.plaintext = encodeURIComponent(tableToCSV(table));
-
-            // div.appendChild(table);
-            // table.replaceWith(div);
             const pe = table.parentElement;
             pe.insertBefore(div, table);
-            pe.removeChild(table);
             div.appendChild(table);
-        }
+            pe.removeChild(table);
+        });
     }
 
-    // Adds syntax highlighting and renders latex formulas to all code blocks in a message
-    #formatCodeBlocks(text) {
-        if (!text) return text;
+    // Formats content with syntax highlighting and LaTeX rendering.
+    #formatContent(text) {
+        if (!text) return null;
         text = text.trim();
 
-        // To mark all SVG as svg, even when the AI marks it as something else
-        text = text.replaceAll(/```\w*\s*<svg\s/smgi, '```svg\n<svg ');
-        // Add xmlns so that the browser actually shows the image
-        text = text.replaceAll(/\(data:image\/svg\+xml,([a-z0-9_"'%+-]+?)\)/smgi, (match, g1) => {
+        // Normalize SVG code blocks.
+        text = text.replace(/```\w*\s*<svg\s/gmi, '```svg\n<svg ');
+        text = text.replace(/\(data:image\/svg\+xml,([a-z0-9_"'%+-]+?)\)/gmi, (match, g1) => {
             let data = decodeURIComponent(g1);
-            data = data.replace(/<svg\s/smgi, '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" ');
-            return '(data:image/svg+xml,' + encodeURIComponent(data) + ')';
+            data = data.replace(/<svg\s/gmi, '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" ');
+            return `(data:image/svg+xml,${encodeURIComponent(data)})`;
         });
 
-        const md_settings = {
+        const mdSettings = {
             html: false, // Whether to allow HTML tags in the source
             xhtmlOut: false, // Whether to use XHTML-style self-closing tags (e.g. <br />)
             breaks: false, // Whether to convert line breaks into <br> tags
@@ -285,42 +256,30 @@ class Chatbox {
                         value = hljs.highlight(code, { language, ignoreIllegals: true }).value;
                     } else {
                         const highlighted = hljs.highlightAuto(code);
-                        language = highlighted.language ? highlighted.language : 'unknown';
+                        language = highlighted.language || 'unknown';
                         value = highlighted.value;
                     }
                 } catch (error) {
-                    console.error(error, code);
+                    console.error('Highlight error:', error, code);
                 }
                 return `<pre class="hljs ${this.langPrefix}${language}" data-plaintext="${encodeURIComponent(code.trim())}"><code>${value}</code></pre>`;
             }
         };
-        const md = window.markdownit(md_settings);
-        md.validateLink = (link) => {
-            if (link.startsWith('javascript:')) return false;
-            return true;
-        };
+        const md = window.markdownit(mdSettings);
+        md.validateLink = link => !link.startsWith('javascript:');
 
         text = md.render(text);
 
-        // would be useful, but the created svgs are not standard conform, so it does not make sense
-        // text = text.replaceAll(/!\[([^]+)\]\((data:image\/[;,+%=a-z0-9-]+)\)/gi, '<img src="$2" alt="$1">');
-
         const origFormulas = [];
-        const kt_settings = {
+        const ktSettings = {
             delimiters: [
                 { left: '$$', right: '$$', display: true },
                 { left: '$', right: '$', display: false },
-                // { left: '\\(', right: '\\)', display: false },
-                { left: '\\begin{equation}', right: '\\end{equation}', display: true },
-                // { left: '\\begin{align}', right: '\\end{align}', display: true },
-                // { left: '\\begin{alignat}', right: '\\end{alignat}', display: true },
-                // { left: '\\begin{gather}', right: '\\end{gather}', display: true },
-                // { left: '\\begin{CD}', right: '\\end{CD}', display: true },
-                // { left: '\\[', right: '\\]', display: true }
+                { left: '\\begin{equation}', right: '\\end{equation}', display: true }
             ],
             ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option', 'table', 'svg'],
             throwOnError: false,
-            preProcess: function (math) {
+            preProcess: math => {
                 origFormulas.push(math);
                 return math;
             }
@@ -330,30 +289,22 @@ class Chatbox {
         wrapper.classList.add('content');
         wrapper.innerHTML = text;
 
-        renderMathInElement(wrapper, kt_settings);
+        renderMathInElement(wrapper, ktSettings);
 
-        const elems = wrapper.querySelectorAll('.katex');
-        if (elems.length === origFormulas.length) {
-            for (let i = 0; i < elems.length; i++) {
-                const formula = elems[i].parentElement;
-                if (formula.classList.contains('katex-display')) {
-                    const div = document.createElement('div');
-                    div.classList.add('hljs');
-                    div.classList.add('language-latex');
-                    div.dataset.plaintext = encodeURIComponent(origFormulas[i].trim());
-
-                    const pe = formula.parentElement;
-                    // div.appendChild(pe);
-                    // pe.replaceWith(div);
-                    const ppe = pe.parentElement;
-                    ppe.insertBefore(div, pe);
-                    ppe.removeChild(pe);
-                    div.appendChild(pe);
-                }
+        wrapper.querySelectorAll('.katex').forEach((elem, i) => {
+            if (i >= origFormulas.length) return;
+            const formula = elem.parentElement;
+            if (formula.classList.contains('katex-display')) {
+                const div = document.createElement('div');
+                div.classList.add('hljs', 'language-latex');
+                div.dataset.plaintext = encodeURIComponent(origFormulas[i].trim());
+                const pe = formula.parentElement;
+                pe.insertBefore(div, formula);
+                div.appendChild(formula);
+                pe.removeChild(formula);
             }
-        }
+        });
 
         return wrapper;
     }
-
 }
