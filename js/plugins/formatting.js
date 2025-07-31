@@ -2,6 +2,20 @@ import { ClipBadge } from '../clipbadge.js';
 
 export const formattingPlugins = [
     {
+        name: 'svg_normalization',
+        hooks: {
+            onFormatContent: function (text) {
+                text = text.replace(/```\w*\s*<svg\s/gmi, '```svg\n<svg ');
+                text = text.replace(/\(data:image\/svg\+xml,([a-z0-9_"'%+-]+?)\)/gmi, (match, g1) => {
+                    let data = decodeURIComponent(g1);
+                    data = data.replace(/<svg\s/gmi, '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" ');
+                    return `(data:image/svg+xml,${encodeURIComponent(data)})`;
+                });
+                return text;
+            }
+        }
+    },
+    {
         name: 'markdown',
         hooks: {
             onFormatContent: function (text) {
@@ -13,7 +27,7 @@ export const formattingPlugins = [
                     linkify: true,
                     typographer: false,
                     quotes: `""''`,
-                    highlight: function (code, language) {
+                    highlight: function (code, language) { // This needs to be a regular function, because arrow functions do not bind their own "this"-context and this.langPrefix would not be accessible.
                         let value = '';
                         try {
                             if (language && hljs.getLanguage(language)) {

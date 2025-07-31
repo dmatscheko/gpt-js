@@ -209,20 +209,10 @@ class Chatbox {
     }
 
     // Formats message content with Markdown, syntax highlighting, and LaTeX rendering.
-    #formatContent(text) {
-        if (!text) return null;
+    #formatContent(html) {
+        if (!html) return null;
         try {
-            text = text.trim();
-
-            // Normalize SVG code blocks for proper rendering.
-            text = text.replace(/```\w*\s*<svg\s/gmi, '```svg\n<svg ');
-            text = text.replace(/\(data:image\/svg\+xml,([a-z0-9_"'%+-]+?)\)/gmi, (match, g1) => {
-                let data = decodeURIComponent(g1);
-                data = data.replace(/<svg\s/gmi, '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" ');
-                return `(data:image/svg+xml,${encodeURIComponent(data)})`;
-            });
-
-            let html = text;
+            html = html.trim();
             hooks.onFormatContent.forEach(fn => { html = fn(html); });
 
             const wrapper = document.createElement('div');
@@ -236,7 +226,7 @@ class Chatbox {
             console.error('Formatting error:', error);
             const wrapper = document.createElement('div');
             wrapper.classList.add('content');
-            wrapper.innerHTML = `<p>Error formatting content: ${error.message}</p><pre>${text}</pre>`;
+            wrapper.innerHTML = `<p>Error formatting content: ${error.message}</p><pre>${html}</pre>`;
             return wrapper;
         }
     }
