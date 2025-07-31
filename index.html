@@ -11,16 +11,16 @@
 </head>
 
 <body>
-    <div id="col-container">
+    <div id="colContainer">
         <h2 id="header">GPT JS Chat</h2>
-        <div id="chat-container">
+        <div id="chatContainer">
             <div id="chat"></div>
         </div>
-        <div id="input-container">
-            <textarea id="message-inp" autofocus
+        <div id="inputContainer">
+            <textarea id="messageInput" autofocus
                 placeholder="Enter multiline message and press &lt;shift&gt;+&lt;enter&gt;, or &lt;ctrl&gt;+&lt;enter&gt;, or click the triangle button."
                 rows="3"></textarea>
-            <button id="submit-btn" title="Submit message / Stop assistant" class="toolbtn">
+            <button id="submitButton" title="Submit message / Stop assistant" class="toolButton">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
                         d="M6 6.741c0-1.544 1.674-2.505 3.008-1.728l9.015 5.26c1.323.771 1.323 2.683 0 3.455l-9.015 5.258C7.674 19.764 6 18.803 6 17.26V6.741zM17.015 12L8 6.741V17.26L17.015 12z"
@@ -28,11 +28,11 @@
                 </svg>
             </button>
         </div>
-        <div id="spacer-bottom" class="only-mobile"></div>
+        <div id="spacerBottom" class="only-mobile"></div>
     </div>
     <div id="source"><small><a href="https://github.com/dmatscheko/gpt-js" target="_blank">github src</a></small></div>
     <div id="buttons">
-        <button id="settings-btn" title="Settings" class="toolbtn">
+        <button id="settingsButton" title="Settings" class="toolButton">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
                     d="M12 4a1 1 0 0 0-1 1c0 1.692-2.046 2.54-3.243 1.343a1 1 0 1 0-1.414 1.414C7.54 8.954 6.693 11 5 11a1 1 0 1 0 0 2c1.692 0 2.54 2.046 1.343 3.243a1 1 0 0 0 1.414 1.414C8.954 16.46 11 17.307 11 19a1 1 0 1 0 2 0c0-1.692 2.046-2.54 3.243-1.343a1 1 0 0 0 1.414-1.414C16.46 15.046 17.307 13 19 13a1 1 0 1 0 0-2c-1.692 0-2.54-2.046-1.343-3.243a1 1 0 0 0-1.414-1.414C15.046 7.54 13 6.693 13 5a1 1 0 0 0-1-1zm-2.992.777a3 3 0 0 1 5.984 0 3 3 0 0 1 4.23 4.231 3 3 0 0 1 .001 5.984 3 3 0 0 1-4.231 4.23 3 3 0 0 1-5.984 0 3 3 0 0 1-4.231-4.23 3 3 0 0 1 0-5.984 3 3 0 0 1 4.231-4.231z"
@@ -42,14 +42,14 @@
                     fill="currentColor" />
             </svg>
         </button><br class="only-desktop"><br class="only-desktop"><span class="only-mobile">&nbsp;&nbsp;&nbsp;</span>
-        <button id="save_chat-btn" title="Save chat" class="toolbtn">
+        <button id="saveChatButton" title="Save chat" class="toolButton">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
                     d="M3 5a2 2 0 0 1 2-2h11.586A2 2 0 0 1 18 3.586l2.707 2.707A1 1 0 0 1 21 7v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm6 14h6v-6H9v6zm8 0h2V7.414l-2-2V7a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V5H5v14h2v-6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v6zM9 5v2h6V5H9z"
                     fill="currentColor" />
             </svg>
         </button>
-        <button id="load_chat-btn" title="Load chat" class="toolbtn">
+        <button id="loadChatButton" title="Load chat" class="toolButton">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
                     d="m 1.9819243,7.2224558 a 2,2 0 0 1 2.0000001,-2 h 5 a 1,1 0 0 1 0.707,0.293 l 1.7069996,1.707 h 8.586 a 2,2 0 0 1 2,2.0000004 v 9.9999998 a 2,2 0 0 1 -2,2 H 3.9819244 a 2,2 0 0 1 -2.0000001,-2 z m 6.5860001,0 h -4.586 V 19.222456 H 19.981924 V 9.2224562 h -9 a 1,1 0 0 1 -0.707,-0.293 z"
@@ -59,7 +59,7 @@
                     fill="currentColor" />
             </svg>
         </button>
-        <button id="new_chat-btn" title="Clear chat" class="toolbtn">
+        <button id="newChatButton" title="Clear chat" class="toolButton">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
                     d="M7 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h4a1 1 0 1 1 0 2h-1.069l-.867 12.142A2 2 0 0 1 17.069 22H6.93a2 2 0 0 1-1.995-1.858L4.07 8H3a1 1 0 0 1 0-2h4V4zm2 2h6V4H9v2zM6.074 8l.857 12H17.07l.857-12H6.074zM10 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm4 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1z"
@@ -68,18 +68,18 @@
         </button>
     </div>
     <div id="settings">
-        <fieldset id="models-fieldset">
-            <legend>Model&nbsp;<button id="refresh-models-btn" title="Refresh models" class="toolbtn small"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" fill="currentColor"/></svg></button></legend>
+        <fieldset id="modelsFieldset">
+            <legend>Model&nbsp;<button id="refreshModelsButton" title="Refresh models" class="toolButton small"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" fill="currentColor"/></svg></button></legend>
         </fieldset>
         <p>
             <label for="temperature">Temperature</label><br>
             <input type="range" id="temperature" min="0" max="2.0" step="0.1" value="0.5">
-            <span id="temperature-value"></span>
+            <span id="temperatureValue"></span>
         </p>
         <p>
-            <label for="top_p">Top-p (nucleus sampling)&nbsp;&nbsp;</label><br>
-            <input type="range" id="top_p" min="0" max="1.0" step="0.05" value="1.0">
-            <span id="top_p-value"></span>
+            <label for="topP">Top-p (nucleus sampling)&nbsp;&nbsp;</label><br>
+            <input type="range" id="topP" min="0" max="1.0" step="0.05" value="1.0">
+            <span id="topPValue"></span>
         </p>
         <!--
         <p>
@@ -101,10 +101,10 @@
             <legend>Connection</legend>
             <label for="endpoint" style="margin-bottom: 4px; display: block;">API Endpoint</label>
             <input type="text" id="endpoint" value="https://api.openai.com/v1/chat/completions">
-            <label for="api_key" style="margin-bottom: 4px; display: block; margin-top: 12px;">API Key</label>
+            <label for="apiKey" style="margin-bottom: 4px; display: block; margin-top: 12px;">API Key</label>
             <div style="position: relative;">
-                <input type="password" id="api_key">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                <button id="clear_api_key-btn" title="Clear API key" class="toolbtn" style="position: absolute; right: 0px; bottom: 0px">
+                <input type="password" id="apiKey">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <button id="clearApiKeyButton" title="Clear API key" class="toolButton" style="position: absolute; right: 0px; bottom: 0px">
                     <svg width="24" height="20" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M1 12 L10 4 H22 V19 H10 Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>
                         <path d="M12 9 Q15 10 17 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>

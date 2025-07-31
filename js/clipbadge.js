@@ -46,6 +46,7 @@ class ClipBadge {
         imageButtonContent: 'Image'
     };
 
+    // Adds a copy badge to a highlighted element.
     addBadge(highlightEl) {
         if (highlightEl.classList.contains('clip-badge-pre')) return;
         const plainText = decodeURIComponent(highlightEl.dataset.plaintext) || highlightEl.textContent;
@@ -147,6 +148,7 @@ class ClipBadge {
         highlightEl.insertAdjacentElement('afterbegin', badge);
     }
 
+    // Retrieves the badge template from the DOM or creates a default one.
     getTemplate() {
         let node = document.querySelector(this.settings.templateSelector);
         if (!node) {
@@ -215,16 +217,19 @@ class ClipBadge {
         return node;
     }
 
+    // Adds badges to all highlighted elements in the content selector.
     addAll() {
         const content = document.querySelector(this.settings.contentSelector);
         content.querySelectorAll('.hljs, .hljs-nobg').forEach(el => this.addBadge(el));
     }
 
+    // Adds badges to highlighted elements within a specific container.
     addTo(container) {
         container.querySelectorAll('.hljs, .hljs-nobg').forEach(el => this.addBadge(el));
         if (container.classList.contains('hljs') || container.classList.contains('hljs-nobg')) this.addBadge(container);
     }
 
+    // Initializes the ClipBadge by appending styles and template.
     init() {
         const node = this.getTemplate();
         document.head.appendChild(node.content.querySelector('style').cloneNode(true));

@@ -1,12 +1,12 @@
 'use strict';
 
-// Global state for API control.
-let controller = new AbortController(); // This allows to abort the streaming of the answer
-let receiving = false; // This is set to true while a streaming communication is active. It prevents multiple parallel messages to the server
-let regenerateLastAnswer = false; // True if the prompt should not be taken from the input box. The last entry in the chatlog has to be a question for this to work
+// Global variables for controlling API requests and state.
+let controller = new AbortController(); // Controller to abort ongoing API requests.
+let receiving = false; // Flag indicating if a response is being received from the API. It prevents multiple parallel messages to the server.
+let regenerateLastAnswer = false; // Flag to regenerate the last answer without new input.
 
-// System prompt configuration.
-const first_prompt = `You have the ability to present perspectives and provide real-time date and time information.
+// The initial system prompt defining AI behavior and capabilities.
+const firstPrompt = `You have the ability to present perspectives and provide real-time date and time information.
 You can create and understand visuals, such as images, graphs, and charts, using SVG technology.
 Unless otherwise specified by the user, always use SVG for drawings.
 You can express mathematical equations using latex notation, symbolized by $ and $$.
@@ -22,21 +22,21 @@ Always apply thoughtful consideration in all tasks.
 Your responses are backed by your extensive knowledge in programming and science.
 Be clear in articulating any ambiguities to ensure effective communication.`;
 
-// Initial message for new chats.
-const start_message = '';
+// Initial message displayed in new chats.
+const startMessage = '';
 
-// Button icons.
-const message_submit = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6.741c0-1.544 1.674-2.505 3.008-1.728l9.015 5.26c1.323.771 1.323 2.683 0 3.455l-9.015 5.258C7.674 19.764 6 18.803 6 17.26V6.741zM17.015 12L8 6.741V17.26L17.015 12z" fill="currentColor"/></svg>';
-const message_stop = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7zm12 0H7v10h10V7z" fill="currentColor"/></svg>';
+// SVG icons for submit and stop buttons.
+const messageSubmit = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6.741c0-1.544 1.674-2.505 3.008-1.728l9.015 5.26c1.323.771 1.323 2.683 0 3.455l-9.015 5.258C7.674 19.764 6 18.803 6 17.26V6.741zM17.015 12L8 6.741V17.26L17.015 12z" fill="currentColor"/></svg>';
+const messageStop = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7zm12 0H7v10h10V7z" fill="currentColor"/></svg>';
 
-// Default avatars.
-const avatar_ping = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+// Default SVG avatars for user (ping) and assistant (pong).
+const avatarPing = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
 <circle cx="40" cy="40" r="40" fill="#FFC107" />
 <circle cx="25" cy="30" r="5" fill="white" />
 <circle cx="55" cy="30" r="5" fill="white" />
 <path d="M 25 55 Q 40 65, 55 55" fill="none" stroke="white" stroke-width="4" />
 </svg>`;
-const avatar_pong = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+const avatarPong = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
 <rect x="2" y="2" width="76" height="76" fill="#2196F3" />
 <circle cx="25" cy="30" r="5" fill="white" />
 <circle cx="55" cy="30" r="5" fill="white" />
