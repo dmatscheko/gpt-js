@@ -1,8 +1,7 @@
 import { Chatbox } from './chatbox.js';
 import { Chatlog } from './chatlog.js';
-import { ClipBadge } from './clipbadge.js';
 import { firstPrompt, startMessage, defaultEndpoint, messageSubmit, messageStop } from './config.js';
-import { openaiChat, populateModels, loadModels, loadModelsFromStorage, getDatePrompt } from './utils.js';
+import { openaiChat, populateModels, loadModels, loadModelsFromStorage, getDatePrompt, showLogin, showLogout } from './utils.js';
 
 'use strict';
 
@@ -201,16 +200,6 @@ import { openaiChat, populateModels, loadModels, loadModelsFromStorage, getDateP
             showLogin();
             populateModels(ui, []);
         });
-    }
-
-    function showLogin() {
-        document.getElementById('session-login').style.display = 'block';
-        document.getElementById('session-logout').style.display = 'none';
-    }
-
-    function showLogout() {
-        document.getElementById('session-login').style.display = 'none';
-        document.getElementById('session-logout').style.display = 'block';
     }
 
 }());

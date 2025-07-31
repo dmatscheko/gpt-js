@@ -7,6 +7,10 @@ import { messageSubmit, messageStop } from './config.js';
 export async function openaiChat(message, chatlog, model, temperature, topP, userRole, ui, state) {
     if (!state.regenerateLastAnswer && !message) return;
     if (state.receiving) return;
+    if (!model) {
+        alert('Please select a model.');
+        return;
+    }
     state.receiving = true;
 
     if (userRole === 'assistant') {
@@ -272,12 +276,12 @@ export async function loadModels(ui, state) {
     }
 }
 
-function showLogin() {
+export function showLogin() {
     document.getElementById('session-login').style.display = 'block';
     document.getElementById('session-logout').style.display = 'none';
 }
 
-function showLogout() {
+export function showLogout() {
     document.getElementById('session-login').style.display = 'none';
     document.getElementById('session-logout').style.display = 'block';
 }
