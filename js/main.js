@@ -1,11 +1,24 @@
+import { Chatbox } from './chatbox.js';
+import { Chatlog } from './chatlog.js';
+import { ClipBadge } from './clipbadge.js';
+import { firstPrompt, startMessage, defaultEndpoint, messageSubmit, messageStop } from './config.js';
+import { openaiChat, populateModels, loadModels, loadModelsFromStorage, getDatePrompt } from './utils.js';
+
 'use strict';
 
 (function () {
 
     document.addEventListener('DOMContentLoaded', async () => {
+        const state = {
+            receiving: false,
+            regenerateLastAnswer: false,
+            controller: new AbortController(),
+            apiKey: localStorage.getItem('gptChat_apiKey') || '',
+        };
+
         const chatlog = new Chatlog();
         const ui = {
-            chatlogEl: new Chatbox(chatlog, document.getElementById('chat')),
+            chatlogEl: new Chatbox(chatlog, document.getElementById('chat'), state),
             messageEl: document.getElementById('messageInput'),
             submitButton: document.getElementById('submitButton'),
             newChatButton: document.getElementById('newChatButton'),
@@ -21,11 +34,10 @@
             apiKeyEl: document.getElementById('apiKey')
         };
 
-        getApiKey();
-        setUpEventListeners(chatlog, ui);
+        setUpEventListeners(chatlog, ui, state);
 
         ui.endpointEl.value = localStorage.getItem('gptChat_endpoint') || defaultEndpoint;
-        ui.apiKeyEl.value = apiKey;
+        ui.apiKeyEl.value = state.apiKey;
 
         // Load persisted chatlog from localStorage.
         const storedChatlog = localStorage.getItem('gptChat_chatlog');
@@ -44,7 +56,7 @@
         if (hasStoredKey) {
             let success = loadModelsFromStorage(ui);
             if (!success) {
-                success = await loadModels(ui);
+                success = await loadModels(ui, state);
             }
             if (success) {
                 showLogout();
@@ -62,10 +74,10 @@
     });
 
     // Sets up event listeners for UI interactions.
-    function setUpEventListeners(chatlog, ui) {
+    function setUpEventListeners(chatlog, ui, state) {
         ui.submitButton.addEventListener('click', () => {
-            if (receiving) {
-                controller.abort();
+            if (state.receiving) {
+                state.controller.abort();
                 return;
             }
             let model = document.querySelector('input[name="model"]:checked')?.value;
@@ -73,7 +85,7 @@
                 model = document.getElementById('custom_model').value.trim();
                 if (!model) return alert('Please enter a custom model ID.');
             }
-            openaiChat(ui.messageEl.value, chatlog, model, Number(ui.temperatureEl.value), Number(ui.topPEl.value), document.querySelector('input[name="user_role"]:checked').value, ui);
+            openaiChat(ui.messageEl.value, chatlog, model, Number(ui.temperatureEl.value), Number(ui.topPEl.value), document.querySelector('input[name="user_role"]:checked').value, ui, state);
             document.getElementById('user').checked = true;
             ui.messageEl.value = '';
             ui.messageEl.style.height = 'auto';
@@ -99,11 +111,11 @@
         });
 
         document.addEventListener('keydown', event => {
-            if (event.key === 'Escape') controller.abort();
+            if (event.key === 'Escape') state.controller.abort();
         });
 
         ui.newChatButton.addEventListener('click', () => {
-            if (receiving) controller.abort();
+            if (state.receiving) state.controller.abort();
             ui.messageEl.value = startMessage;
             ui.messageEl.style.height = 'auto';
             chatlog.rootAlternatives = null;
@@ -131,9 +143,14 @@
                 const file = input.files[0];
                 const reader = new FileReader();
                 reader.addEventListener('load', () => {
-                    const data = JSON.parse(reader.result);
-                    chatlog.load(data.rootAlternatives);
-                    ui.chatlogEl.update();
+                    try {
+                        const data = JSON.parse(reader.result);
+                        chatlog.load(data.rootAlternatives);
+                        ui.chatlogEl.update();
+                    } catch (error) {
+                        console.error('Failed to parse loaded chatlog:', error);
+                        alert('Invalid chatlog file.');
+                    }
                 });
                 reader.readAsText(file);
             });
@@ -150,7 +167,7 @@
 
         ui.settingsButton.addEventListener('click', () => ui.settingsEl.classList.toggle('open'));
 
-        document.getElementById('refreshModelsButton').addEventListener('click', async () => await loadModels(ui));
+        document.getElementById('refreshModelsButton').addEventListener('click', async () => await loadModels(ui, state));
 
         // Save selected model to localStorage on change.
         const saveModel = () => {
@@ -166,9 +183,9 @@
         document.getElementById('login-btn').addEventListener('click', async () => {
             const key = ui.apiKeyEl.value.trim();
             localStorage.setItem('gptChat_apiKey', key);
-            apiKey = key;
+            state.apiKey = key;
             localStorage.setItem('gptChat_endpoint', ui.endpointEl.value);
-            if (await loadModels(ui)) {
+            if (await loadModels(ui, state)) {
                 showLogout();
                 if (!chatlog.rootAlternatives) ui.newChatButton.click();
             }
@@ -177,7 +194,7 @@
         document.getElementById('logout-btn').addEventListener('click', () => {
             localStorage.removeItem('gptChat_apiKey');
             localStorage.removeItem('gptChat_models');
-            apiKey = '';
+            state.apiKey = '';
             ui.apiKeyEl.value = '';
             ui.endpointEl.value = defaultEndpoint;
             localStorage.setItem('gptChat_endpoint', defaultEndpoint);

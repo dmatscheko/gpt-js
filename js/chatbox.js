@@ -1,13 +1,17 @@
-'use strict';
+import { firstPrompt, avatarPing, avatarPong } from './config.js';
+import { getDatePrompt } from './utils.js';
+import { hooks } from './hooks.js';
+import { ClipBadge } from './clipbadge.js';
 
-// TODO: Maybe add token count and answer price to the title.
+'use strict';
 
 // Class responsible for displaying the chat messages in the UI.
 class Chatbox {
-    // Initializes the Chatbox with a chatlog and container element.
-    constructor(chatlog, container) {
+    // Initializes the Chatbox with a chatlog, container element, and state.
+    constructor(chatlog, container, state) {
         this.chatlog = chatlog;
         this.container = container;
+        this.state = state;
         this.clipBadge = new ClipBadge({ autoRun: false });
     }
 
@@ -127,6 +131,9 @@ class Chatbox {
             this.clipBadge.addTo(el);
         }
 
+        // Plugin hook for modifying rendered message element
+        hooks.onRenderMessage.forEach(fn => fn(el, message));
+
         return el;
     }
 
@@ -150,9 +157,9 @@ class Chatbox {
             if (alternative) alternative.addMessage(newMessage);
             this.update(false);
             if (type === 'pong') {
-                if (receiving) controller.abort();
+                if (this.state.receiving) this.state.controller.abort();
                 setTimeout(() => {
-                    regenerateLastAnswer = true;
+                    this.state.regenerateLastAnswer = true;
                     document.getElementById('submitButton').click();
                 }, 100);
                 return;
@@ -316,3 +323,5 @@ class Chatbox {
         return wrapper;
     }
 }
+
+export { Chatbox };

@@ -237,3 +237,5 @@ class ClipBadge {
         if (this.settings.autoRun) this.addAll();
     }
 }
+
+export { ClipBadge };

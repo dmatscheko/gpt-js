@@ -1,30 +1,47 @@
+import { hooks } from './hooks.js';
+import { messageSubmit, messageStop } from './config.js';
+
 'use strict';
 
 // Fetches a chat completion from the OpenAI API with streaming support.
-async function openaiChat(message, chatlog, model, temperature, topP, userRole, ui) {
-    if (!regenerateLastAnswer && !message) return;
-    if (receiving) return;
-    receiving = true;
+export async function openaiChat(message, chatlog, model, temperature, topP, userRole, ui, state) {
+    if (!state.regenerateLastAnswer && !message) return;
+    if (state.receiving) return;
+    state.receiving = true;
 
     if (userRole === 'assistant') {
-        chatlog.addMessage({ role: userRole, content: message });
+        let modifiedContent = message;
+        for (let fn of hooks.beforeUserMessageAdd) {
+            const result = fn(modifiedContent, userRole);
+            if (result === false) return;
+            if (typeof result === 'string') modifiedContent = result;
+        }
+        const newMessage = chatlog.addMessage({ role: userRole, content: modifiedContent });
+        hooks.afterMessageAdd.forEach(fn => fn(newMessage));
         ui.chatlogEl.update();
-        receiving = false;
+        state.receiving = false;
         return;
     }
 
     ui.submitButton.innerHTML = messageStop;
     let entryCreated = false;
     try {
-        if (!regenerateLastAnswer) {
+        if (!state.regenerateLastAnswer) {
             message = message.trim();
-            chatlog.addMessage({ role: userRole, content: message });
+            let modifiedContent = message;
+            for (let fn of hooks.beforeUserMessageAdd) {
+                const result = fn(modifiedContent, userRole);
+                if (result === false) throw new Error('Message addition cancelled by plugin');
+                if (typeof result === 'string') modifiedContent = result;
+            }
+            const newMessage = chatlog.addMessage({ role: userRole, content: modifiedContent });
+            hooks.afterMessageAdd.forEach(fn => fn(newMessage));
             chatlog.addMessage(null);
         }
-        regenerateLastAnswer = false;
+        state.regenerateLastAnswer = false;
         ui.chatlogEl.update();
 
-        const payload = {
+        let payload = {
             model,
             messages: chatlog.getActiveMessageValues(),
             temperature,
@@ -34,21 +51,26 @@ async function openaiChat(message, chatlog, model, temperature, topP, userRole, 
 
         if (payload.messages.length <= 1) return;
 
+        for (let fn of hooks.beforeApiCall) {
+            const modified = fn(payload);
+            if (modified) payload = modified;
+        }
+
         const headers = {
             'Content-Type': 'application/json'
         };
-        if (apiKey) {
-            headers['Authorization'] = `Bearer ${apiKey}`;
+        if (state.apiKey) {
+            headers['Authorization'] = `Bearer ${state.apiKey}`;
         }
 
         const response = await fetch(ui.endpointEl.value, {
-            signal: controller.signal,
+            signal: state.controller.signal,
             method: 'POST',
             headers,
             body: JSON.stringify(payload)
         });
 
-        if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+        if (!response.ok) throw new Error(`API error: ${response.statusText} (${response.status})`);
 
         const reader = response.body.getReader();
         while (true) {
@@ -60,33 +82,48 @@ async function openaiChat(message, chatlog, model, temperature, topP, userRole, 
                 if (data.error) throw new Error(data.error.message);
             }
             const chunks = valueStr.split('\n');
-            let content = '';
+            let delta = '';
             chunks.forEach(chunk => {
                 if (!chunk.startsWith('data: ')) return;
                 chunk = chunk.substring(6);
                 if (chunk === '' || chunk === '[DONE]') return;
-                const data = JSON.parse(chunk);
+                let data;
+                try {
+                    data = JSON.parse(chunk);
+                } catch (err) {
+                    console.error('JSON parse error in chunk:', err, chunk);
+                    return;
+                }
                 if (data.error) throw new Error(data.error.message);
-                content += data.choices[0].delta.content || '';
+                delta += data.choices[0].delta.content || '';
             });
 
-            if (content === '') continue;
+            if (delta === '') continue;
+
+            hooks.onChunkReceived.forEach(fn => fn(delta));
 
             if (!entryCreated) {
-                const lastMessage = chatlog.addMessage({ role: 'assistant', content });
+                const lastMessage = chatlog.addMessage({ role: 'assistant', content: delta });
                 entryCreated = true;
                 lastMessage.metadata = { model, temperature, top_p: topP };
+                hooks.afterMessageAdd.forEach(fn => fn(lastMessage));
             } else {
                 const lastMessage = chatlog.getLastMessage();
-                lastMessage.value.content += content;
+                lastMessage.value.content += delta;
                 lastMessage.cache = null;
             }
             ui.chatlogEl.update();
         }
+
+        if (entryCreated) {
+            const lastMessage = chatlog.getLastMessage();
+            hooks.onMessageComplete.forEach(fn => fn(lastMessage));
+        }
     } catch (error) {
         console.error('OpenAI chat error:', error);
+        hooks.onError.forEach(fn => fn(error));
         if (error.name === 'AbortError') {
-            controller = new AbortController();
+            state.controller = new AbortController();
             return;
         }
         if (error.message.includes('API key')) {
@@ -98,13 +135,15 @@ async function openaiChat(message, chatlog, model, temperature, topP, userRole, 
         }
 
         if (!entryCreated) {
-            chatlog.addMessage({ role: 'assistant', content: `${error}` });
+            const errorMessage = chatlog.addMessage({ role: 'assistant', content: `${error}` });
             entryCreated = true;
+            hooks.afterMessageAdd.forEach(fn => fn(errorMessage));
         } else {
-            chatlog.getLastMessage().value.content += `\n\n${error}`;
+            const lastMessage = chatlog.getLastMessage();
+            lastMessage.value.content += `\n\n${error}`;
         }
     } finally {
-        receiving = false;
+        state.receiving = false;
         ui.submitButton.innerHTML = messageSubmit;
         if (entryCreated) {
             const lastMessage = chatlog.getLastMessage();
@@ -115,13 +154,13 @@ async function openaiChat(message, chatlog, model, temperature, topP, userRole, 
 }
 
 // Generates a prompt suffix with the current date and time.
-function getDatePrompt() {
+export function getDatePrompt() {
     const now = new Date();
     return `\n\nKnowledge cutoff: none\nCurrent date: ${now.toISOString().slice(0, 10)}\nCurrent time: ${now.toTimeString().slice(0, 5)}`;
 }
 
 // Populates the models fieldset with the given models array.
-function populateModels(ui, models) {
+export function populateModels(ui, models) {
     const fieldset = document.getElementById('modelsFieldset');
     fieldset.querySelectorAll('input[type="radio"][name="model"], label[for^="model_"], br, p').forEach(el => el.remove());
 
@@ -181,10 +220,16 @@ function populateModels(ui, models) {
 }
 
 // Loads models from local storage and populates the UI if available.
-function loadModelsFromStorage(ui) {
+export function loadModelsFromStorage(ui) {
     const storedModels = localStorage.getItem('gptChat_models');
     if (storedModels) {
-        const models = JSON.parse(storedModels);
+        let models;
+        try {
+            models = JSON.parse(storedModels);
+        } catch (err) {
+            console.error('Failed to parse stored models:', err);
+            return false;
+        }
         populateModels(ui, models);
         return true;
     }
@@ -192,20 +237,20 @@ function loadModelsFromStorage(ui) {
 }
 
 // Loads available models from the API and populates the UI.
-async function loadModels(ui) {
+export async function loadModels(ui, state) {
     const modelsUrl = ui.endpointEl.value.replace(/\/chat\/completions$/, '/models');
     try {
         const headers = {
             'Content-Type': 'application/json'
         };
-        if (apiKey) {
-            headers['Authorization'] = `Bearer ${apiKey}`;
+        if (state.apiKey) {
+            headers['Authorization'] = `Bearer ${state.apiKey}`;
         }
         const resp = await fetch(modelsUrl, {
             method: 'GET',
             headers
         });
-        if (!resp.ok) throw new Error(resp.statusText);
+        if (!resp.ok) throw new Error(`${resp.statusText} (${resp.status})`);
         const data = await resp.json();
         let models = (data.data || []).sort((a, b) => a.id.localeCompare(b.id));
         localStorage.setItem('gptChat_models', JSON.stringify(models));
@@ -217,7 +262,7 @@ async function loadModels(ui) {
         if (localStorage.getItem('gptChat_apiKey') !== null) {
             localStorage.removeItem('gptChat_apiKey');
             localStorage.removeItem('gptChat_models');
-            apiKey = '';
+            state.apiKey = '';
             ui.apiKeyEl.value = '';
             showLogin();
             populateModels(ui, []);
@@ -227,9 +272,12 @@ async function loadModels(ui) {
     }
 }
 
-// Retrieves the API key from localStorage.
-function getApiKey() {
-    apiKey = localStorage.getItem('gptChat_apiKey') || '';
+function showLogin() {
+    document.getElementById('session-login').style.display = 'block';
+    document.getElementById('session-logout').style.display = 'none';
 }
 
-let apiKey = '';
+function showLogout() {
+    document.getElementById('session-login').style.display = 'none';
+    document.getElementById('session-logout').style.display = 'block';
+}

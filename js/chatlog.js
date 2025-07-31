@@ -183,3 +183,5 @@ class Chatlog {
         this.load(this.rootAlternatives);
     }
 }
+
+export { Chatlog, Message, Alternatives };
