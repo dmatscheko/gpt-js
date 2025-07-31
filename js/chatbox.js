@@ -1,7 +1,6 @@
 import { firstPrompt, avatarPing, avatarPong } from './config.js';
 import { getDatePrompt } from './utils.js';
 import { hooks } from './hooks.js';
-import { ClipBadge } from './clipbadge.js';
 
 'use strict';
 
@@ -12,7 +11,6 @@ class Chatbox {
         this.chatlog = chatlog;
         this.container = container;
         this.state = state;
-        this.clipBadge = new ClipBadge({ autoRun: false });
     }
 
     // Updates the HTML content inside the chat window, optionally scrolling to the bottom.
@@ -114,21 +112,12 @@ class Chatbox {
         const formattedContent = this.#formatContent(message.value.content);
         if (formattedContent) {
             el.appendChild(formattedContent);
-        } else {
-            const div = document.createElement('div');
-            div.innerHTML = 'Error: Timeout on API server.';
-            el.appendChild(div);
         }
 
         this.#attachMessageEvents(el, type, pos, message);
 
         if (msgIdx > 0 || msgCnt > 1) {
             this.#attachNavigationEvents(el);
-        }
-
-        if (this.clipBadge) {
-            this.#prepareCopyableElements(el);
-            this.clipBadge.addTo(el);
         }
 
         // Plugin hook for modifying rendered message element
@@ -219,108 +208,37 @@ class Chatbox {
         return avatar;
     }
 
-    // Prepares tables and other elements for copy-to-clipboard functionality.
-    #prepareCopyableElements(parent) {
-        const tableToCSV = (table) => {
-            const separator = ';';
-            const rows = table.querySelectorAll('tr');
-            return Array.from(rows).map(row => 
-                Array.from(row.querySelectorAll('td, th')).map(col => 
-                    `"${col.innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/(\s\s)/gm, ' ').replace(/"/g, '""')}"`
-                ).join(separator)
-            ).join('\n');
-        };
-
-        parent.querySelectorAll('table').forEach(table => {
-            const div = document.createElement('div');
-            div.classList.add('hljs-nobg', 'hljs-table', 'language-table');
-            div.dataset.plaintext = encodeURIComponent(tableToCSV(table));
-            const pe = table.parentElement;
-            pe.insertBefore(div, table);
-            pe.removeChild(table);
-            div.appendChild(table);
-        });
-    }
-
     // Formats message content with Markdown, syntax highlighting, and LaTeX rendering.
     #formatContent(text) {
         if (!text) return null;
-        text = text.trim();
+        try {
+            text = text.trim();
 
-        // Normalize SVG code blocks for proper rendering.
-        text = text.replace(/```\w*\s*<svg\s/gmi, '```svg\n<svg ');
-        text = text.replace(/\(data:image\/svg\+xml,([a-z0-9_"'%+-]+?)\)/gmi, (match, g1) => {
-            let data = decodeURIComponent(g1);
-            data = data.replace(/<svg\s/gmi, '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" ');
-            return `(data:image/svg+xml,${encodeURIComponent(data)})`;
-        });
+            // Normalize SVG code blocks for proper rendering.
+            text = text.replace(/```\w*\s*<svg\s/gmi, '```svg\n<svg ');
+            text = text.replace(/\(data:image\/svg\+xml,([a-z0-9_"'%+-]+?)\)/gmi, (match, g1) => {
+                let data = decodeURIComponent(g1);
+                data = data.replace(/<svg\s/gmi, '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" ');
+                return `(data:image/svg+xml,${encodeURIComponent(data)})`;
+            });
 
-        const mdSettings = {
-            html: false, // Whether to allow HTML tags in the source
-            xhtmlOut: false, // Whether to use XHTML-style self-closing tags (e.g. <br />)
-            breaks: false, // Whether to convert line breaks into <br> tags
-            langPrefix: 'language-', // The prefix for CSS classes applied to code blocks
-            linkify: true, // Whether to automatically convert URLs to links
-            typographer: false, // Whether to use typographic replacements for quotation marks and the like
-            quotes: `""''`, // Which types of quotes to use, if typographer is true
-             // This needs to be a regular function, because arrow functions do not bind their own this context and this.langPrefix would not be accessible
-            highlight: function (code, language) {
-                let value = '';
-                try {
-                    if (language && hljs.getLanguage(language)) {
-                        value = hljs.highlight(code, { language, ignoreIllegals: true }).value;
-                    } else {
-                        const highlighted = hljs.highlightAuto(code);
-                        language = highlighted.language || 'unknown';
-                        value = highlighted.value;
-                    }
-                } catch (error) {
-                    console.error('Highlight error:', error, code);
-                }
-                return `<pre class="hljs ${this.langPrefix}${language}" data-plaintext="${encodeURIComponent(code.trim())}"><code>${value}</code></pre>`;
-            }
-        };
-        const md = window.markdownit(mdSettings);
-        md.validateLink = link => !link.startsWith('javascript:');
+            let html = text;
+            hooks.onFormatContent.forEach(fn => { html = fn(html); });
 
-        text = md.render(text);
+            const wrapper = document.createElement('div');
+            wrapper.classList.add('content');
+            wrapper.innerHTML = html;
 
-        const origFormulas = [];
-        const ktSettings = {
-            delimiters: [
-                { left: '$$', right: '$$', display: true },
-                { left: '$', right: '$', display: false },
-                { left: '\\begin{equation}', right: '\\end{equation}', display: true }
-            ],
-            ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option', 'table', 'svg'],
-            throwOnError: false,
-            preProcess: math => {
-                origFormulas.push(math);
-                return math;
-            }
-        };
+            hooks.onPostFormatContent.forEach(fn => { fn(wrapper); });
 
-        const wrapper = document.createElement('div');
-        wrapper.classList.add('content');
-        wrapper.innerHTML = text;
-
-        renderMathInElement(wrapper, ktSettings);
-
-        wrapper.querySelectorAll('.katex').forEach((elem, i) => {
-            if (i >= origFormulas.length) return;
-            const formula = elem.parentElement;
-            if (formula.classList.contains('katex-display')) {
-                const div = document.createElement('div');
-                div.classList.add('hljs', 'language-latex');
-                div.dataset.plaintext = encodeURIComponent(origFormulas[i].trim());
-                const pe = formula.parentElement;
-                pe.insertBefore(div, formula);
-                div.appendChild(formula);
-                pe.removeChild(formula);
-            }
-        });
-
-        return wrapper;
+            return wrapper;
+        } catch (error) {
+            console.error('Formatting error:', error);
+            const wrapper = document.createElement('div');
+            wrapper.classList.add('content');
+            wrapper.innerHTML = `<p>Error formatting content: ${error.message}</p><pre>${text}</pre>`;
+            return wrapper;
+        }
     }
 }
 
