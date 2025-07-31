@@ -1,4 +1,4 @@
-import { firstPrompt, avatarPing, avatarPong } from './config.js';
+import { firstPrompt } from './config.js';
 import { getDatePrompt } from './utils.js';
 import { hooks } from './hooks.js';
 
@@ -95,8 +95,6 @@ class Chatbox {
         el.dataset.plaintext = encodeURIComponent(message.value.content.trim());
         el.dataset.pos = pos;
 
-        el.appendChild(this.#createAvatar(type));
-
         let msgStat = '';
         if (msgIdx > 0 || msgCnt > 1) {
             msgStat = `<button title="Previous Message" class="msg_mod-prev-btn toolButton small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 7.766c0-1.554-1.696-2.515-3.029-1.715l-7.056 4.234c-1.295.777-1.295 2.653 0 3.43l7.056 4.234c1.333.8 3.029-.16 3.029-1.715V7.766zM9.944 12L17 7.766v8.468L9.944 12zM6 6a1 1 0 0 1 1 1v10a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;${msgIdx + 1}/${msgCnt}&nbsp;<button title="Next Message" class="msg_mod-next-btn toolButton small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 7.766c0-1.554 1.696-2.515 3.029-1.715l7.056 4.234c1.295.777 1.295 2.653 0 3.43L8.03 17.949c-1.333.8-3.029-.16-3.029-1.715V7.766zM14.056 12L7 7.766v8.468L14.056 12zM18 6a1 1 0 0 1 1 1v10a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;&nbsp;`;
@@ -121,7 +119,7 @@ class Chatbox {
         }
 
         // Plugin hook for modifying rendered message element
-        hooks.onRenderMessage.forEach(fn => fn(el, message));
+        hooks.onRenderMessage.forEach(fn => fn(el, message, this));
 
         return el;
     }
@@ -170,49 +168,13 @@ class Chatbox {
         });
     }
 
-    // Creates and returns an avatar image element for the message type.
-    #createAvatar(type) {
-        const avatar = document.createElement('img');
-        let avatarSrc = localStorage.getItem(`gptChat_${type}Avatar`);
-        const isCustom = !!avatarSrc;
-        avatar.classList.add('avatar');
-        if (localStorage) avatar.classList.add('clickable');
-        avatar.src = avatarSrc || `data:image/svg+xml,${encodeURIComponent(type === 'ping' ? avatarPing : avatarPong)}`;
-
-        avatar.addEventListener('click', () => {
-            if (!localStorage) return;
-            if (isCustom) {
-                avatar.src = `data:image/svg+xml,${encodeURIComponent(type === 'ping' ? avatarPing : avatarPong)}`;
-                localStorage.removeItem(`gptChat_${type}Avatar`);
-                this.chatlog.clearCache();
-                this.update(false);
-                return;
-            }
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.addEventListener('change', () => {
-                const file = input.files[0];
-                const reader = new FileReader();
-                reader.addEventListener('load', () => {
-                    localStorage.setItem(`gptChat_${type}Avatar`, reader.result);
-                    avatar.src = reader.result;
-                    this.chatlog.clearCache();
-                    this.update(false);
-                });
-                reader.readAsDataURL(file);
-            });
-            input.click();
-        });
-
-        return avatar;
-    }
-
     // Formats message content with Markdown, syntax highlighting, and LaTeX rendering.
-    #formatContent(html) {
-        if (!html) return null;
+    #formatContent(text) {
+        if (!text) return null;
         try {
-            html = html.trim();
+            text = text.trim();
+
+            let html = text;
             hooks.onFormatContent.forEach(fn => { html = fn(html); });
 
             const wrapper = document.createElement('div');
@@ -226,7 +188,7 @@ class Chatbox {
             console.error('Formatting error:', error);
             const wrapper = document.createElement('div');
             wrapper.classList.add('content');
-            wrapper.innerHTML = `<p>Error formatting content: ${error.message}</p><pre>${html}</pre>`;
+            wrapper.innerHTML = `<p>Error formatting content: ${error.message}</p><pre>${text}</pre>`;
             return wrapper;
         }
     }

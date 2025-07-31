@@ -1,5 +1,7 @@
 import { ClipBadge } from '../clipbadge.js';
 
+'use strict';
+
 export const formattingPlugins = [
     {
         name: 'svg_normalization',
@@ -86,7 +88,7 @@ export const formattingPlugins = [
     {
         name: 'clipbadge',
         hooks: {
-            onRenderMessage: function (el, message) {
+            onRenderMessage: function (el, message, chatbox) {
                 const tableToCSV = (table) => {
                     const separator = ';';
                     const rows = table.querySelectorAll('tr');

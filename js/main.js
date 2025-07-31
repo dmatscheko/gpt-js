@@ -4,12 +4,14 @@ import { firstPrompt, startMessage, defaultEndpoint, messageSubmit, messageStop 
 import { openaiChat, populateModels, loadModels, loadModelsFromStorage, getDatePrompt, showLogin, showLogout } from './utils.js';
 import { hooks, registerPlugin } from './hooks.js';
 import { formattingPlugins } from './plugins/formatting.js';
+import { avatarsPlugin } from './plugins/avatars.js';
 
 'use strict';
 
 (function () {
 
     formattingPlugins.forEach(registerPlugin);
+    registerPlugin(avatarsPlugin);
 
     document.addEventListener('DOMContentLoaded', async () => {
         const state = {
