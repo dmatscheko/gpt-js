@@ -170,6 +170,7 @@
             localStorage.setItem('gptChat_endpoint', ui.endpointEl.value);
             if (await loadModels(ui)) {
                 showLogout();
+                if (!chatlog.rootAlternatives) ui.newChatButton.click();
             }
         });
 

@@ -230,8 +230,8 @@ class Chatbox {
             div.dataset.plaintext = encodeURIComponent(tableToCSV(table));
             const pe = table.parentElement;
             pe.insertBefore(div, table);
-            div.appendChild(table);
             pe.removeChild(table);
+            div.appendChild(table);
         });
     }
 
