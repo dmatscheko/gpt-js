@@ -43,3 +43,5 @@ const avatarPong = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" 
 <rect x="15" y="50" width="50" height="5" fill="#ffffff" />
 <rect x="25" y="60" width="30" height="5" fill="#ffffff" />
 </svg>`;
+
+const defaultEndpoint = 'https://api.openai.com/v1/chat/completions';

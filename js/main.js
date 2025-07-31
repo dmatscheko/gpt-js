@@ -2,7 +2,7 @@
 
 (function () {
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
         const chatlog = new Chatlog();
         const ui = {
             chatlogEl: new Chatbox(chatlog, document.getElementById('chat')),
@@ -18,18 +18,14 @@
             topPEl: document.getElementById('topP'),
             topPValueEl: document.getElementById('topPValue'),
             endpointEl: document.getElementById('endpoint'),
-            apiKeyEl: document.getElementById('apiKey'),
-            clearApiKeyButton: document.getElementById('clearApiKeyButton')
+            apiKeyEl: document.getElementById('apiKey')
         };
 
         getApiKey();
         setUpEventListeners(chatlog, ui);
 
-        ui.apiKeyEl.value = apiKey || '';
-        if (!apiKey) {
-            ui.settingsEl.classList.add('open');
-            setTimeout(() => ui.apiKeyEl.focus(), 100);
-        }
+        ui.endpointEl.value = localStorage.getItem('gptChat_endpoint') || defaultEndpoint;
+        ui.apiKeyEl.value = apiKey;
 
         // Load persisted chatlog from localStorage.
         const storedChatlog = localStorage.getItem('gptChat_chatlog');
@@ -44,13 +40,25 @@
             }
         }
 
-        // Load stored endpoint.
-        const storedEndpoint = localStorage.getItem('gptChat_endpoint');
-        if (storedEndpoint) ui.endpointEl.value = storedEndpoint;
-
-        if (apiKey) loadModels(ui);
-
-        if (!chatlog.rootAlternatives) ui.newChatButton.click();
+        const hasStoredKey = localStorage.getItem('gptChat_apiKey') !== null;
+        if (hasStoredKey) {
+            let success = loadModelsFromStorage(ui);
+            if (!success) {
+                success = await loadModels(ui);
+            }
+            if (success) {
+                showLogout();
+                if (!chatlog.rootAlternatives) ui.newChatButton.click();
+            } else {
+                ui.settingsEl.classList.add('open');
+                setTimeout(() => ui.apiKeyEl.focus(), 100);
+            }
+        } else {
+            showLogin();
+            populateModels(ui, []);
+            ui.settingsEl.classList.add('open');
+            setTimeout(() => ui.endpointEl.focus(), 100);
+        }
     });
 
     // Sets up event listeners for UI interactions.
@@ -142,18 +150,7 @@
 
         ui.settingsButton.addEventListener('click', () => ui.settingsEl.classList.toggle('open'));
 
-        ui.apiKeyEl.addEventListener('input', () => {
-            localStorage.setItem('gptChat_apiKey', ui.apiKeyEl.value);
-            apiKey = ui.apiKeyEl.value;
-        });
-
-        ui.clearApiKeyButton.addEventListener('click', () => {
-            localStorage.removeItem('gptChat_apiKey');
-            apiKey = '';
-            ui.apiKeyEl.value = '';
-        });
-
-        document.getElementById('refreshModelsButton').addEventListener('click', () => loadModels(ui));
+        document.getElementById('refreshModelsButton').addEventListener('click', async () => await loadModels(ui));
 
         // Save selected model to localStorage on change.
         const saveModel = () => {
@@ -165,6 +162,37 @@
         document.getElementById('custom_model')?.addEventListener('input', () => {
             if (document.getElementById('model_custom')?.checked) saveModel();
         });
+
+        document.getElementById('login-btn').addEventListener('click', async () => {
+            const key = ui.apiKeyEl.value.trim();
+            localStorage.setItem('gptChat_apiKey', key);
+            apiKey = key;
+            localStorage.setItem('gptChat_endpoint', ui.endpointEl.value);
+            if (await loadModels(ui)) {
+                showLogout();
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            localStorage.removeItem('gptChat_apiKey');
+            localStorage.removeItem('gptChat_models');
+            apiKey = '';
+            ui.apiKeyEl.value = '';
+            ui.endpointEl.value = defaultEndpoint;
+            localStorage.setItem('gptChat_endpoint', defaultEndpoint);
+            showLogin();
+            populateModels(ui, []);
+        });
+    }
+
+    function showLogin() {
+        document.getElementById('session-login').style.display = 'block';
+        document.getElementById('session-logout').style.display = 'none';
+    }
+
+    function showLogout() {
+        document.getElementById('session-login').style.display = 'none';
+        document.getElementById('session-logout').style.display = 'block';
     }
 
 }());

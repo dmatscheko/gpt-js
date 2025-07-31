@@ -260,6 +260,12 @@ a:hover {
     text-align: right;
 }
 
+#session-login, #session-logout {
+    display: none;
+    margin-top: 8px;
+    text-align: center;
+}
+
 /* Highlight.js styles */
 .hljs {
     padding: 8px;

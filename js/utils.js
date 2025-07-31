@@ -34,13 +34,17 @@ async function openaiChat(message, chatlog, model, temperature, topP, userRole, 
 
         if (payload.messages.length <= 1) return;
 
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        if (apiKey) {
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+
         const response = await fetch(ui.endpointEl.value, {
             signal: controller.signal,
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
+            headers,
             body: JSON.stringify(payload)
         });
 
@@ -116,79 +120,110 @@ function getDatePrompt() {
     return `\n\nKnowledge cutoff: none\nCurrent date: ${now.toISOString().slice(0, 10)}\nCurrent time: ${now.toTimeString().slice(0, 5)}`;
 }
 
+// Populates the models fieldset with the given models array.
+function populateModels(ui, models) {
+    const fieldset = document.getElementById('modelsFieldset');
+    fieldset.querySelectorAll('input[type="radio"][name="model"], label[for^="model_"], br, p').forEach(el => el.remove());
+
+    if (!models.length) {
+        const p = document.createElement('p');
+        p.textContent = 'No models available.';
+        fieldset.appendChild(p);
+        return;
+    }
+
+    models.forEach(model => {
+        const safeId = model.id.replace(/[^a-z0-9_-]/gi, '_');
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'model';
+        input.value = model.id;
+        input.id = `model_${safeId}`;
+        const label = document.createElement('label');
+        label.htmlFor = `model_${safeId}`;
+        label.textContent = model.id;
+        fieldset.appendChild(input);
+        fieldset.appendChild(label);
+        fieldset.appendChild(document.createElement('br'));
+    });
+
+    // Add custom model input option.
+    const customInput = document.createElement('input');
+    customInput.type = 'radio';
+    customInput.name = 'model';
+    customInput.value = 'custom';
+    customInput.id = 'model_custom';
+    const customLabel = document.createElement('label');
+    customLabel.htmlFor = 'model_custom';
+    customLabel.textContent = 'Custom: ';
+    const customText = document.createElement('input');
+    customText.type = 'text';
+    customText.id = 'custom_model';
+    customText.placeholder = 'Enter model ID';
+    customLabel.appendChild(customText);
+    fieldset.appendChild(customInput);
+    fieldset.appendChild(customLabel);
+    fieldset.appendChild(document.createElement('br'));
+
+    // Restore previously selected model.
+    const storedModel = localStorage.getItem('gptChat_model');
+    if (storedModel) {
+        let radio = fieldset.querySelector(`input[value="${storedModel}"]`);
+        if (radio) radio.checked = true;
+        else {
+            customInput.checked = true;
+            customText.value = storedModel;
+        }
+    } else {
+        const defaultRadio = fieldset.querySelector('input[value="gpt-3.5-turbo"]') || fieldset.querySelector('input[name="model"]');
+        if (defaultRadio) defaultRadio.checked = true;
+    }
+}
+
+// Loads models from local storage and populates the UI if available.
+function loadModelsFromStorage(ui) {
+    const storedModels = localStorage.getItem('gptChat_models');
+    if (storedModels) {
+        const models = JSON.parse(storedModels);
+        populateModels(ui, models);
+        return true;
+    }
+    return false;
+}
+
 // Loads available models from the API and populates the UI.
 async function loadModels(ui) {
     const modelsUrl = ui.endpointEl.value.replace(/\/chat\/completions$/, '/models');
     try {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        if (apiKey) {
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        }
         const resp = await fetch(modelsUrl, {
             method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            }
+            headers
         });
         if (!resp.ok) throw new Error(resp.statusText);
         const data = await resp.json();
         let models = (data.data || []).sort((a, b) => a.id.localeCompare(b.id));
-        const fieldset = document.getElementById('modelsFieldset');
-        fieldset.querySelectorAll('input[type="radio"][name="model"], label[for^="model_"], br').forEach(el => el.remove());
-
-        if (!models.length) {
-            const p = document.createElement('p');
-            p.textContent = 'No models available.';
-            fieldset.appendChild(p);
-            return;
-        }
-
-        models.forEach(model => {
-            const safeId = model.id.replace(/[^a-z0-9_-]/gi, '_');
-            const input = document.createElement('input');
-            input.type = 'radio';
-            input.name = 'model';
-            input.value = model.id;
-            input.id = `model_${safeId}`;
-            const label = document.createElement('label');
-            label.htmlFor = `model_${safeId}`;
-            label.textContent = model.id;
-            fieldset.appendChild(input);
-            fieldset.appendChild(label);
-            fieldset.appendChild(document.createElement('br'));
-        });
-
-        // Add custom model input option.
-        const customInput = document.createElement('input');
-        customInput.type = 'radio';
-        customInput.name = 'model';
-        customInput.value = 'custom';
-        customInput.id = 'model_custom';
-        const customLabel = document.createElement('label');
-        customLabel.htmlFor = 'model_custom';
-        customLabel.textContent = 'Custom: ';
-        const customText = document.createElement('input');
-        customText.type = 'text';
-        customText.id = 'custom_model';
-        customText.placeholder = 'Enter model ID';
-        customLabel.appendChild(customText);
-        fieldset.appendChild(customInput);
-        fieldset.appendChild(customLabel);
-        fieldset.appendChild(document.createElement('br'));
-
-        // Restore previously selected model.
-        const storedModel = localStorage.getItem('gptChat_model');
-        if (storedModel) {
-            let radio = fieldset.querySelector(`input[value="${storedModel}"]`);
-            if (radio) radio.checked = true;
-            else {
-                customInput.checked = true;
-                customText.value = storedModel;
-            }
-        } else {
-            const defaultRadio = fieldset.querySelector('input[value="gpt-3.5-turbo"]') || fieldset.querySelector('input[name="model"]');
-            if (defaultRadio) defaultRadio.checked = true;
-        }
+        localStorage.setItem('gptChat_models', JSON.stringify(models));
+        populateModels(ui, models);
+        return true;
     } catch (err) {
         console.error('Failed to load models:', err);
         alert(`Failed to load models: ${err.message}`);
+        if (localStorage.getItem('gptChat_apiKey') !== null) {
+            localStorage.removeItem('gptChat_apiKey');
+            localStorage.removeItem('gptChat_models');
+            apiKey = '';
+            ui.apiKeyEl.value = '';
+            showLogin();
+            populateModels(ui, []);
+            alert('Session invalid, logged out.');
+        }
+        return false;
     }
 }
 
