@@ -452,3 +452,15 @@ a:hover {
         border: 1px solid #583333;
     }
 }
+
+/* Message button hover visibility */
+/*
+.msg_mod-add-btn, .msg_mod-del-btn, .msg_mod-prev-btn, .msg_mod-next-btn {
+    opacity: 0.2;
+    transition: opacity 0.2s;
+}
+
+.message:hover .msg_mod-add-btn, .message:hover .msg_mod-del-btn, .message:hover .msg_mod-prev-btn, .message:hover .msg_mod-next-btn {
+    opacity: 1;
+}
+*/
