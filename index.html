@@ -15,7 +15,36 @@
         <h2 id="header">GPT JS Chat</h2>
         <div id="mainContent" style="display: flex; flex: 1; overflow: hidden;">
             <div id="chatListContainer">
-                <ul id="chatList"></ul>
+                <div id="chatListWrapper">
+                    <ul id="chatList"></ul>
+                </div>
+                <div id="chatControls">
+                    <div class="left-buttons">
+                        <button id="saveChatButton" title="Save current chat" class="toolButton">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    d="M3 5a2 2 0 0 1 2-2h11.586A2 2 0 0 1 18 3.586l2.707 2.707A1 1 0 0 1 21 7v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm6 14h6v-6H9v6zm8 0h2V7.414l-2-2V7a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V5H5v14h2v-6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v6zM9 5v2h6V5H9z"
+                                    fill="currentColor" />
+                            </svg>
+                        </button>
+                        <button id="loadChatButton" title="Load chat" class="toolButton">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    d="m 1.9819243,7.2224558 a 2,2 0 0 1 2.0000001,-2 h 5 a 1,1 0 0 1 0.707,0.293 l 1.7069996,1.707 h 8.586 a 2,2 0 0 1 2,2.0000004 v 9.9999998 a 2,2 0 0 1 -2,2 H 3.9819244 a 2,2 0 0 1 -2.0000001,-2 z m 6.5860001,0 h -4.586 V 19.222456 H 19.981924 V 9.2224562 h -9 a 1,1 0 0 1 -0.707,-0.293 z"
+                                    fill="currentColor" />
+                                <path
+                                    d="M 2.3055156,7.2224558 3.0246072,4.7775442 c 0.3116724,-1.0596858 0.8954305,-2 2,-2 h 4.9999998 c 0.265195,5.67e-5 0.519507,0.1054506 0.707,0.293 l 1.707,1.707 7.579272,-0.1078637 c 1.104457,-0.015718 2.015556,0.89554 2,2 l -0.03596,2.5527757 h -2 l 0.03596,-2.5527757 -7.993272,0.1078637 c -0.265195,-5.66e-5 -0.519507,-0.1054506 -0.707,-0.293 l -1.7070048,-1.707 h -4.586 L 4.3055155,7.2224558 Z"
+                                    fill="currentColor" />
+                            </svg>
+                        </button>
+                    </div>
+                    <button id="newChatButton" title="New chat" class="toolButton">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1z" fill="currentColor"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div id="chatArea" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
                 <div id="chatContainer">
@@ -50,29 +79,6 @@
                 <path
                     d="M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-2.828-.828a4 4 0 1 1 5.656 5.656 4 4 0 0 1-5.656-5.656z"
                     fill="currentColor" />
-            </svg>
-        </button>
-        <button id="saveChatButton" title="Save current chat" class="toolButton">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                    d="M3 5a2 2 0 0 1 2-2h11.586A2 2 0 0 1 18 3.586l2.707 2.707A1 1 0 0 1 21 7v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm6 14h6v-6H9v6zm8 0h2V7.414l-2-2V7a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V5H5v14h2v-6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v6zM9 5v2h6V5H9z"
-                    fill="currentColor" />
-            </svg>
-        </button>
-        <button id="loadChatButton" title="Load chat" class="toolButton">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                    d="m 1.9819243,7.2224558 a 2,2 0 0 1 2.0000001,-2 h 5 a 1,1 0 0 1 0.707,0.293 l 1.7069996,1.707 h 8.586 a 2,2 0 0 1 2,2.0000004 v 9.9999998 a 2,2 0 0 1 -2,2 H 3.9819244 a 2,2 0 0 1 -2.0000001,-2 z m 6.5860001,0 h -4.586 V 19.222456 H 19.981924 V 9.2224562 h -9 a 1,1 0 0 1 -0.707,-0.293 z"
-                    fill="currentColor" />
-                <path
-                    d="M 2.3055156,7.2224558 3.0246072,4.7775442 c 0.3116724,-1.0596858 0.8954305,-2 2,-2 h 4.9999998 c 0.265195,5.67e-5 0.519507,0.1054506 0.707,0.293 l 1.707,1.707 7.579272,-0.1078637 c 1.104457,-0.015718 2.015556,0.89554 2,2 l -0.03596,2.5527757 h -2 l 0.03596,-2.5527757 -7.993272,0.1078637 c -0.265195,-5.66e-5 -0.519507,-0.1054506 -0.707,-0.293 l -1.7070048,-1.707 h -4.586 L 4.3055155,7.2224558 Z"
-                    fill="currentColor" />
-            </svg>
-        </button>
-        <button id="newChatButton" title="New chat" class="toolButton">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                    d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1z" fill="currentColor"/>
             </svg>
         </button>
     </div>

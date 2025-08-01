@@ -39,10 +39,39 @@ html, body {
 /* Chat list container */
 #chatListContainer {
     width: 250px;
-    overflow-y: auto;
     background-color: #343542;
     padding: 10px;
     border-right: 1px solid #20212280;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+#chatListWrapper {
+    flex: 1;
+    overflow-y: auto;
+}
+
+#chatList {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+#chatControls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #20212280;
+}
+
+#chatControls .left-buttons {
+    display: flex;
+    gap: 5px;
 }
 
 .chat-item {
@@ -384,7 +413,7 @@ a:hover {
     }
 
     #chatListContainer {
-        display: block !important;
+        display: flex !important;
     }
 }
 
