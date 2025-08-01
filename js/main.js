@@ -1,5 +1,5 @@
 import { Chatbox } from './chatbox.js';
-import { Chatlog } from './chatlog.js';
+import { Chatlog, Alternatives } from './chatlog.js';
 import { firstPrompt, startMessage, defaultEndpoint, messageSubmit, messageStop } from './config.js';
 import { openaiChat, populateModels, loadModels, loadModelsFromStorage, getDatePrompt, showLogin, showLogout } from './utils.js';
 import { hooks, registerPlugin } from './hooks.js';
@@ -9,7 +9,6 @@ import { avatarsPlugin } from './plugins/avatars.js';
 'use strict';
 
 (function () {
-
     formattingPlugins.forEach(registerPlugin);
     registerPlugin(avatarsPlugin);
 
@@ -21,7 +20,9 @@ import { avatarsPlugin } from './plugins/avatars.js';
             apiKey: localStorage.getItem('gptChat_apiKey') || '',
         };
 
-        const chatlog = new Chatlog();
+        let chats = [];
+        let currentChatId = null;
+        let chatlog = new Chatlog();
         const ui = {
             chatlogEl: new Chatbox(chatlog, document.getElementById('chat'), state),
             messageEl: document.getElementById('messageInput'),
@@ -39,23 +40,150 @@ import { avatarsPlugin } from './plugins/avatars.js';
             apiKeyEl: document.getElementById('apiKey')
         };
 
-        setUpEventListeners(chatlog, ui, state);
-
-        ui.endpointEl.value = localStorage.getItem('gptChat_endpoint') || defaultEndpoint;
-        ui.apiKeyEl.value = state.apiKey;
-
-        // Load persisted chatlog from localStorage.
-        const storedChatlog = localStorage.getItem('gptChat_chatlog');
-        if (storedChatlog) {
-            try {
-                const data = JSON.parse(storedChatlog);
-                chatlog.load(data.rootAlternatives);
-                ui.chatlogEl.update();
-            } catch (error) {
-                console.error('Failed to load stored chatlog:', error);
-                alert('Failed to load chat history. Starting a new session.');
+        const persistChats = () => {
+            if (currentChatId) {
+                const current = chats.find(c => c.id === currentChatId);
+                if (current) {
+                    current.data = chatlog.toJSON();
+                }
             }
+            localStorage.setItem('gptChat_chats', JSON.stringify(chats));
+            localStorage.setItem('gptChat_currentChatId', currentChatId);
+        };
+
+        ui.chatlogEl.onUpdate = persistChats;
+
+        const createNewChat = () => {
+            const id = Date.now().toString();
+            const title = 'New Chat';
+            const newChatlog = new Chatlog();
+            newChatlog.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
+            chats.push({ id, title, data: newChatlog.toJSON() });
+            switchChat(id);
+            updateChatList();
+        };
+
+        const switchChat = (id) => {
+            persistChats(); // Save current before switching
+            currentChatId = id;
+            const newCurrent = chats.find(c => c.id === id);
+            chatlog = new Chatlog();
+            if (newCurrent.data) {
+                chatlog.load(newCurrent.data);
+            }
+            ui.chatlogEl.chatlog = chatlog;
+            ui.chatlogEl.update();
+            updateChatList();
+            if (window.innerWidth <= 1037) {
+                document.getElementById('chatListContainer').style.display = 'none';
+            }
+        };
+
+        const updateChatList = () => {
+            const list = document.getElementById('chatList');
+            list.innerHTML = '';
+            chats.forEach(chat => {
+                const li = document.createElement('li');
+                li.classList.add('chat-item');
+                if (chat.id === currentChatId) li.classList.add('active');
+                li.addEventListener('click', () => switchChat(chat.id));
+                const titleInput = document.createElement('input');
+                titleInput.type = 'text';
+                titleInput.value = chat.title;
+                titleInput.addEventListener('change', () => {
+                    chat.title = titleInput.value;
+                    persistChats();
+                });
+                li.appendChild(titleInput);
+                const delBtn = document.createElement('button');
+                delBtn.classList.add('toolButton', 'small');
+                delBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h4a1 1 0 1 1 0 2h-1.069l-.867 12.142A2 2 0 0 1 17.069 22H6.93a2 2 0 0 1-1.995-1.858L4.07 8H3a1 1 0 0 1 0-2h4V4zm2 2h6V4H9v2zM6.074 8l.857 12H17.07l.857-12H6.074zM10 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm4 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1z" fill="currentColor"/></svg>';
+                delBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    chats = chats.filter(c => c.id !== chat.id);
+                    if (currentChatId === chat.id) {
+                        if (chats.length > 0) {
+                            switchChat(chats[0].id);
+                        } else {
+                            createNewChat();
+                        }
+                    } else {
+                        updateChatList();
+                        persistChats();
+                    }
+                });
+                li.appendChild(delBtn);
+                list.appendChild(li);
+            });
+        };
+
+        const loadChats = () => {
+            const storedChats = localStorage.getItem('gptChat_chats');
+            let migrated = false;
+            let legacyLoaded = false;
+            if (storedChats) {
+                chats = JSON.parse(storedChats);
+            } else {
+                const oldChatlog = localStorage.getItem('gptChat_chatlog');
+                if (oldChatlog) {
+                    const parsed = JSON.parse(oldChatlog);
+                    let rootData;
+                    if (parsed.rootAlternatives) {
+                        rootData = parsed.rootAlternatives;
+                    } else {
+                        const tempLog = new Chatlog();
+                        parsed.forEach(msg => tempLog.addMessage(msg));
+                        rootData = tempLog.toJSON();
+                    }
+                    chats = [{ id: Date.now().toString(), title: 'Legacy Chat', data: rootData }];
+                    localStorage.removeItem('gptChat_chatlog');
+                    legacyLoaded = true;
+                } else {
+                    chats = [];
+                }
+            }
+            chats.forEach(chat => {
+                if (Array.isArray(chat.data)) {
+                    const temp = new Chatlog();
+                    chat.data.forEach(msg => temp.addMessage(msg));
+                    chat.data = temp.toJSON();
+                    migrated = true;
+                }
+                const tempLog = new Chatlog();
+                tempLog.load(chat.data);
+                const first = tempLog.getFirstMessage();
+                if (!first || first.value.role !== 'system') {
+                    const oldRoot = tempLog.rootAlternatives;
+                    tempLog.rootAlternatives = new Alternatives();
+                    const sysMsg = tempLog.rootAlternatives.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
+                    sysMsg.answerAlternatives = oldRoot;
+                    chat.data = tempLog.toJSON();
+                    migrated = true;
+                }
+            });
+            if (migrated || legacyLoaded) {
+                localStorage.setItem('gptChat_chats', JSON.stringify(chats));
+            }
+            currentChatId = localStorage.getItem('gptChat_currentChatId');
+        };
+
+        loadChats();
+
+        if (chats.length === 0) {
+            createNewChat();
+        } else {
+            if (!currentChatId || !chats.find(c => c.id === currentChatId)) {
+                currentChatId = chats[0].id;
+            }
+            const currentChat = chats.find(c => c.id === currentChatId);
+            chatlog = new Chatlog();
+            if (currentChat.data) {
+                chatlog.load(currentChat.data);
+            }
+            ui.chatlogEl.chatlog = chatlog;
+            ui.chatlogEl.update();
         }
+        updateChatList();
 
         const hasStoredKey = localStorage.getItem('gptChat_apiKey') !== null;
         if (hasStoredKey) {
@@ -65,7 +193,6 @@ import { avatarsPlugin } from './plugins/avatars.js';
             }
             if (success) {
                 showLogout();
-                if (!chatlog.rootAlternatives) ui.newChatButton.click();
             } else {
                 ui.settingsEl.classList.add('open');
                 setTimeout(() => ui.apiKeyEl.focus(), 100);
@@ -76,10 +203,16 @@ import { avatarsPlugin } from './plugins/avatars.js';
             ui.settingsEl.classList.add('open');
             setTimeout(() => ui.endpointEl.focus(), 100);
         }
+
+        ui.endpointEl.value = localStorage.getItem('gptChat_endpoint') || defaultEndpoint;
+
+        window.addEventListener('beforeunload', persistChats);
+
+        setUpEventListeners(ui, state, createNewChat, persistChats, switchChat, updateChatList);
     });
 
     // Sets up event listeners for UI interactions.
-    function setUpEventListeners(chatlog, ui, state) {
+    function setUpEventListeners(ui, state, createNewChat, persistChats, switchChat, updateChatList) {
         ui.submitButton.addEventListener('click', () => {
             if (state.receiving) {
                 state.controller.abort();
@@ -90,7 +223,7 @@ import { avatarsPlugin } from './plugins/avatars.js';
                 model = document.getElementById('custom_model').value.trim();
                 if (!model) return alert('Please enter a custom model ID.');
             }
-            openaiChat(ui.messageEl.value, chatlog, model, Number(ui.temperatureEl.value), Number(ui.topPEl.value), document.querySelector('input[name="user_role"]:checked').value, ui, state);
+            openaiChat(ui.messageEl.value, ui.chatlogEl.chatlog, model, Number(ui.temperatureEl.value), Number(ui.topPEl.value), document.querySelector('input[name="user_role"]:checked').value, ui, state);
             document.getElementById('user').checked = true;
             ui.messageEl.value = '';
             ui.messageEl.style.height = 'auto';
@@ -123,18 +256,18 @@ import { avatarsPlugin } from './plugins/avatars.js';
             if (state.receiving) state.controller.abort();
             ui.messageEl.value = startMessage;
             ui.messageEl.style.height = 'auto';
-            chatlog.rootAlternatives = null;
-            chatlog.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
-            ui.chatlogEl.update();
+            createNewChat();
         });
 
         ui.saveChatButton.addEventListener('click', () => {
-            const jsonData = JSON.stringify(chatlog);
+            const current = chats.find(c => c.id === currentChatId);
+            if (!current) return;
+            const jsonData = JSON.stringify({ title: current.title, data: current.data });
             const blob = new Blob([jsonData], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'chatlog.json';
+            a.download = `${current.title.replace(/\s/g, '_')}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -149,9 +282,19 @@ import { avatarsPlugin } from './plugins/avatars.js';
                 const reader = new FileReader();
                 reader.addEventListener('load', () => {
                     try {
-                        const data = JSON.parse(reader.result);
-                        chatlog.load(data.rootAlternatives);
-                        ui.chatlogEl.update();
+                        let loaded = JSON.parse(reader.result);
+                        let data = loaded.data;
+                        if (!data && loaded.rootAlternatives) {
+                            data = loaded.rootAlternatives;
+                        } else if (!data && typeof loaded === 'object') {
+                            data = loaded;
+                        }
+                        const id = Date.now().toString();
+                        const title = loaded.title || 'Imported Chat';
+                        chats.push({ id, title, data });
+                        switchChat(id);
+                        updateChatList();
+                        persistChats();
                     } catch (error) {
                         console.error('Failed to parse loaded chatlog:', error);
                         alert('Invalid chatlog file.');
@@ -164,7 +307,6 @@ import { avatarsPlugin } from './plugins/avatars.js';
 
         ui.temperatureValueEl.textContent = ui.temperatureEl.value;
         ui.temperatureEl.addEventListener('input', () => ui.temperatureValueEl.textContent = ui.temperatureEl.value);
-
         ui.topPValueEl.textContent = ui.topPEl.value;
         ui.topPEl.addEventListener('input', () => ui.topPValueEl.textContent = ui.topPEl.value);
 
@@ -192,7 +334,6 @@ import { avatarsPlugin } from './plugins/avatars.js';
             localStorage.setItem('gptChat_endpoint', ui.endpointEl.value);
             if (await loadModels(ui, state)) {
                 showLogout();
-                if (!chatlog.rootAlternatives) ui.newChatButton.click();
             }
         });
 
@@ -206,6 +347,10 @@ import { avatarsPlugin } from './plugins/avatars.js';
             showLogin();
             populateModels(ui, []);
         });
-    }
 
+        document.getElementById('toggleChatList').addEventListener('click', () => {
+            const cl = document.getElementById('chatListContainer');
+            cl.style.display = cl.style.display === 'block' ? 'none' : 'block';
+        });
+    }
 }());

@@ -11,6 +11,7 @@ class Chatbox {
         this.chatlog = chatlog;
         this.container = container;
         this.state = state;
+        this.onUpdate = null;
     }
 
     // Updates the HTML content inside the chat window, optionally scrolling to the bottom.
@@ -66,23 +67,13 @@ class Chatbox {
             this.container.parentElement.scrollTop = this.container.parentElement.scrollHeight;
         }
 
-        this.#persistChatlog();
+        if (this.onUpdate) this.onUpdate();
     }
 
     // Checks if the chat container is scrolled to the bottom.
     #isScrolledToBottom() {
         const { scrollHeight, clientHeight, scrollTop } = this.container.parentElement;
         return scrollHeight - clientHeight <= scrollTop + 5;
-    }
-
-    // Persists the chatlog to localStorage.
-    #persistChatlog() {
-        try {
-            localStorage.setItem('gptChat_chatlog', JSON.stringify(this.chatlog));
-        } catch (error) {
-            console.error('Failed to persist chatlog:', error);
-            alert('Failed to save chat history. Please check your browser storage settings.');
-        }
     }
 
     // Formats a single message as an HTML element.

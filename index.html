@@ -13,25 +13,35 @@
 <body>
     <div id="colContainer">
         <h2 id="header">GPT JS Chat</h2>
-        <div id="chatContainer">
-            <div id="chat"></div>
-        </div>
-        <div id="inputContainer">
-            <textarea id="messageInput" autofocus
-                placeholder="Enter multiline message and press &lt;shift&gt;+&lt;enter&gt;, or &lt;ctrl&gt;+&lt;enter&gt;, or click the triangle button."
-                rows="3"></textarea>
-            <button id="submitButton" title="Submit message / Stop assistant" class="toolButton">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                        d="M6 6.741c0-1.544 1.674-2.505 3.008-1.728l9.015 5.26c1.323.771 1.323 2.683 0 3.455l-9.015 5.258C7.674 19.764 6 18.803 6 17.26V6.741zM17.015 12L8 6.741V17.26L17.015 12z"
-                        fill="currentColor" />
-                </svg>
-            </button>
+        <div id="mainContent" style="display: flex; flex: 1; overflow: hidden;">
+            <div id="chatListContainer">
+                <ul id="chatList"></ul>
+            </div>
+            <div id="chatArea" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                <div id="chatContainer">
+                    <div id="chat"></div>
+                </div>
+                <div id="inputContainer">
+                    <textarea id="messageInput" autofocus
+                        placeholder="Enter multiline message and press &lt;shift&gt;+&lt;enter&gt;, or &lt;ctrl&gt;+&lt;enter&gt;, or click the triangle button."
+                        rows="3"></textarea>
+                    <button id="submitButton" title="Submit message / Stop assistant" class="toolButton">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                d="M6 6.741c0-1.544 1.674-2.505 3.008-1.728l9.015 5.26c1.323.771 1.323 2.683 0 3.455l-9.015 5.258C7.674 19.764 6 18.803 6 17.26V6.741zM17.015 12L8 6.741V17.26L17.015 12z"
+                                fill="currentColor" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
         </div>
         <div id="spacerBottom" class="only-mobile"></div>
     </div>
     <div id="source"><small><a href="https://github.com/dmatscheko/gpt-js" target="_blank">github src</a></small></div>
     <div id="buttons">
+        <button id="toggleChatList" title="Chats list" class="toolButton only-mobile">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 5h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2zm18 4H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2zm0 6H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2z" fill="currentColor"/></svg>
+        </button>
         <button id="settingsButton" title="Settings" class="toolButton">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
@@ -41,7 +51,7 @@
                     d="M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-2.828-.828a4 4 0 1 1 5.656 5.656 4 4 0 0 1-5.656-5.656z"
                     fill="currentColor" />
             </svg>
-        </button><br class="only-desktop"><br class="only-desktop"><span class="only-mobile">&nbsp;&nbsp;&nbsp;</span>
+        </button>
         <button id="saveChatButton" title="Save chat" class="toolButton">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
@@ -59,11 +69,10 @@
                     fill="currentColor" />
             </svg>
         </button>
-        <button id="newChatButton" title="Clear chat" class="toolButton">
+        <button id="newChatButton" title="New chat" class="toolButton">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
-                    d="M7 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h4a1 1 0 1 1 0 2h-1.069l-.867 12.142A2 2 0 0 1 17.069 22H6.93a2 2 0 0 1-1.995-1.858L4.07 8H3a1 1 0 0 1 0-2h4V4zm2 2h6V4H9v2zM6.074 8l.857 12H17.07l.857-12H6.074zM10 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm4 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1z"
-                    fill="currentColor" />
+                    d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1z" fill="currentColor"/>
             </svg>
         </button>
     </div>

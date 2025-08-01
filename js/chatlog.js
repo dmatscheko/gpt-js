@@ -81,6 +81,13 @@ class Alternatives {
     clearCache() {
         this.messages.forEach(msg => { if (msg) msg.cache = null; });
     }
+
+    toJSON() {
+        return {
+            messages: this.messages.map(msg => msg ? msg.toJSON() : null),
+            activeMessageIndex: this.activeMessageIndex
+        };
+    }
 }
 
 // Manages the entire chat history as a tree of alternatives.
@@ -167,6 +174,7 @@ class Chatlog {
             const alt = new Alternatives();
             alt.activeMessageIndex = data.activeMessageIndex;
             data.messages.forEach(parsedMsg => {
+                if (!parsedMsg) return;
                 const msg = new Message(parsedMsg.value);
                 msg.metadata = parsedMsg.metadata;
                 msg.answerAlternatives = buildAlternatives(parsedMsg.answerAlternatives);
@@ -176,11 +184,31 @@ class Chatlog {
             return alt;
         };
         this.rootAlternatives = buildAlternatives(alternativesData);
+        this.clean();
+    }
+
+    // Removes messages with null values (incomplete messages).
+    clean() {
+        if (!this.rootAlternatives) return;
+        const cleanAlt = (alt) => {
+            alt.messages = alt.messages.filter(msg => msg.value !== null);
+            if (alt.activeMessageIndex >= alt.messages.length) {
+                alt.activeMessageIndex = alt.messages.length - 1;
+            }
+            alt.messages.forEach(msg => {
+                if (msg.answerAlternatives) cleanAlt(msg.answerAlternatives);
+            });
+        };
+        cleanAlt(this.rootAlternatives);
     }
 
     // Clears all caches in the chatlog by reloading the structure.
     clearCache() {
         this.load(this.rootAlternatives);
+    }
+
+    toJSON() {
+        return this.rootAlternatives ? this.rootAlternatives.toJSON() : null;
     }
 }
 
