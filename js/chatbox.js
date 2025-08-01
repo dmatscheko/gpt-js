@@ -95,7 +95,7 @@ class Chatbox {
             model = `&nbsp;<span class="right">${message.metadata.model}</span>`;
         }
         const msgTitleStrip = document.createElement('small');
-        msgTitleStrip.innerHTML = `<span class="nobreak"><button title="New Message" class="msg_mod-add-btn toolButton small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;&nbsp;${msgStat}<b>${message.value.role}</b>${model}</span><br><br>`;
+        msgTitleStrip.innerHTML = `<span class="nobreak"><button title="New Message" class="msg_mod-add-btn toolButton small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;&nbsp;${msgStat}<b>${message.value.role}</b>${model}&nbsp;&nbsp;<button title="Delete Message" class="msg_mod-del-btn toolButton small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h4a1 1 0 1 1 0 2h-1.069l-.867 12.142A2 2 0 0 1 17.069 22H6.93a2 2 0 0 1-1.995-1.858L4.07 8H3a1 1 0 0 1 0-2h4V4zm2 2h6V4H9v2zM6.074 8l.857 12H17.07l.857-12H6.074zM10 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm4 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button></span><br><br>`;
         el.appendChild(msgTitleStrip);
 
         const formattedContent = this.#formatContent(message.value.content);
@@ -143,6 +143,21 @@ class Chatbox {
                 return;
             }
             messageInput.focus();
+        });
+
+        el.querySelector('.msg_mod-del-btn').addEventListener('click', () => {
+            const alternatives = this.chatlog.getNthAlternatives(pos);
+            if (!alternatives) return;
+            const activeIdx = alternatives.activeMessageIndex;
+            if (activeIdx === -1) return;
+            alternatives.messages.splice(activeIdx, 1);
+            if (alternatives.messages.length === 0) {
+                alternatives.activeMessageIndex = -1;
+            } else {
+                alternatives.activeMessageIndex = Math.min(activeIdx, alternatives.messages.length - 1);
+            }
+            this.chatlog.clearCache();
+            this.update(false);
         });
     }
 
