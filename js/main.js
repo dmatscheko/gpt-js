@@ -23,6 +23,7 @@ import { avatarsPlugin } from './plugins/avatars.js';
         let chats = [];
         let currentChatId = null;
         let chatlog = new Chatlog();
+
         const ui = {
             chatlogEl: new Chatbox(chatlog, document.getElementById('chat'), state),
             messageEl: document.getElementById('messageInput'),
@@ -86,15 +87,38 @@ import { avatarsPlugin } from './plugins/avatars.js';
                 const li = document.createElement('li');
                 li.classList.add('chat-item');
                 if (chat.id === currentChatId) li.classList.add('active');
-                li.addEventListener('click', () => switchChat(chat.id));
-                const titleInput = document.createElement('input');
-                titleInput.type = 'text';
-                titleInput.value = chat.title;
-                titleInput.addEventListener('change', () => {
-                    chat.title = titleInput.value;
-                    persistChats();
+                li.addEventListener('click', () => switchChat(chat.id)); // Clicking the li (except buttons) switches chats
+
+                const titleSpan = document.createElement('span');
+                titleSpan.textContent = chat.title;
+                li.appendChild(titleSpan);
+
+                const editBtn = document.createElement('button');
+                editBtn.classList.add('toolButton', 'small');
+                editBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg>'; // Pencil icon
+                editBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent switching chats
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = chat.title;
+                    input.addEventListener('blur', () => {
+                        chat.title = input.value.trim() || 'Untitled Chat'; // Fallback if empty
+                        persistChats();
+                        updateChatList(); // Refresh list to show updated span
+                    });
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') input.blur(); // Save on Enter
+                        if (e.key === 'Escape') {
+                            input.value = chat.title; // Revert on Escape
+                            input.blur();
+                        }
+                    });
+                    titleSpan.replaceWith(input);
+                    input.focus();
+                    input.select(); // Highlight text for easy editing
                 });
-                li.appendChild(titleInput);
+                li.appendChild(editBtn);
+
                 const delBtn = document.createElement('button');
                 delBtn.classList.add('toolButton', 'small');
                 delBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h4a1 1 0 1 1 0 2h-1.069l-.867 12.142A2 2 0 0 1 17.069 22H6.93a2 2 0 0 1-1.995-1.858L4.07 8H3a1 1 0 0 1 0-2h4V4zm2 2h6V4H9v2zM6.074 8l.857 12H17.07l.857-12H6.074zM10 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm4 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1z" fill="currentColor"/></svg>';
@@ -113,6 +137,7 @@ import { avatarsPlugin } from './plugins/avatars.js';
                     }
                 });
                 li.appendChild(delBtn);
+
                 list.appendChild(li);
             });
         };
@@ -121,6 +146,7 @@ import { avatarsPlugin } from './plugins/avatars.js';
             const storedChats = localStorage.getItem('gptChat_chats');
             let migrated = false;
             let legacyLoaded = false;
+
             if (storedChats) {
                 chats = JSON.parse(storedChats);
             } else {
@@ -142,6 +168,7 @@ import { avatarsPlugin } from './plugins/avatars.js';
                     chats = [];
                 }
             }
+
             chats.forEach(chat => {
                 if (Array.isArray(chat.data)) {
                     const temp = new Chatlog();
@@ -149,6 +176,7 @@ import { avatarsPlugin } from './plugins/avatars.js';
                     chat.data = temp.toJSON();
                     migrated = true;
                 }
+
                 const tempLog = new Chatlog();
                 tempLog.load(chat.data);
                 const first = tempLog.getFirstMessage();
@@ -161,9 +189,11 @@ import { avatarsPlugin } from './plugins/avatars.js';
                     migrated = true;
                 }
             });
+
             if (migrated || legacyLoaded) {
                 localStorage.setItem('gptChat_chats', JSON.stringify(chats));
             }
+
             currentChatId = localStorage.getItem('gptChat_currentChatId');
         };
 
@@ -183,6 +213,7 @@ import { avatarsPlugin } from './plugins/avatars.js';
             ui.chatlogEl.chatlog = chatlog;
             ui.chatlogEl.update();
         }
+
         updateChatList();
 
         const hasStoredKey = localStorage.getItem('gptChat_apiKey') !== null;
@@ -218,11 +249,13 @@ import { avatarsPlugin } from './plugins/avatars.js';
                 state.controller.abort();
                 return;
             }
+
             let model = document.querySelector('input[name="model"]:checked')?.value;
             if (model === 'custom') {
                 model = document.getElementById('custom_model').value.trim();
                 if (!model) return alert('Please enter a custom model ID.');
             }
+
             openaiChat(ui.messageEl.value, ui.chatlogEl.chatlog, model, Number(ui.temperatureEl.value), Number(ui.topPEl.value), document.querySelector('input[name="user_role"]:checked').value, ui, state);
             document.getElementById('user').checked = true;
             ui.messageEl.value = '';
@@ -307,6 +340,7 @@ import { avatarsPlugin } from './plugins/avatars.js';
 
         ui.temperatureValueEl.textContent = ui.temperatureEl.value;
         ui.temperatureEl.addEventListener('input', () => ui.temperatureValueEl.textContent = ui.temperatureEl.value);
+
         ui.topPValueEl.textContent = ui.topPEl.value;
         ui.topPEl.addEventListener('input', () => ui.topPValueEl.textContent = ui.topPEl.value);
 
@@ -322,6 +356,7 @@ import { avatarsPlugin } from './plugins/avatars.js';
             if (model === 'custom') model = document.getElementById('custom_model')?.value.trim();
             if (model) localStorage.setItem('gptChat_model', model);
         };
+
         document.getElementById('modelsFieldset').addEventListener('change', saveModel);
         document.getElementById('custom_model')?.addEventListener('input', () => {
             if (document.getElementById('model_custom')?.checked) saveModel();

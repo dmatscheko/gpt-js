@@ -59,6 +59,14 @@ html, body {
     border-radius: 5px;
 }
 
+.chat-item span {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer; /* Indicates it's clickable for selection */
+}
+
 .chat-item input {
     flex: 1;
     background: transparent;
@@ -69,6 +77,12 @@ html, body {
 
 .chat-item button {
     margin-left: 5px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.chat-item:hover button {
+    opacity: 1;
 }
 
 /* Chat area */
