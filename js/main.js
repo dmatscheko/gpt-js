@@ -239,153 +239,153 @@ import { avatarsPlugin } from './plugins/avatars.js';
 
         window.addEventListener('beforeunload', persistChats);
 
+        // Sets up event listeners for UI interactions.
+        function setUpEventListeners(ui, state, createNewChat, persistChats, switchChat, updateChatList) {
+            ui.submitButton.addEventListener('click', () => {
+                if (state.receiving) {
+                    state.controller.abort();
+                    return;
+                }
+
+                let model = document.querySelector('input[name="model"]:checked')?.value;
+                if (model === 'custom') {
+                    model = document.getElementById('custom_model').value.trim();
+                    if (!model) return alert('Please enter a custom model ID.');
+                }
+
+                openaiChat(ui.messageEl.value, ui.chatlogEl.chatlog, model, Number(ui.temperatureEl.value), Number(ui.topPEl.value), document.querySelector('input[name="user_role"]:checked').value, ui, state);
+                document.getElementById('user').checked = true;
+                ui.messageEl.value = '';
+                ui.messageEl.style.height = 'auto';
+            });
+
+            ui.messageEl.addEventListener('keydown', event => {
+                if (event.keyCode === 13 && (event.shiftKey || event.ctrlKey || event.altKey)) {
+                    event.preventDefault();
+                    ui.submitButton.click();
+                }
+            });
+
+            ui.messageEl.addEventListener('input', function () {
+                this.style.height = 'auto';
+                let height = this.scrollHeight - parseInt(getComputedStyle(this).paddingTop) - parseInt(getComputedStyle(this).paddingBottom);
+                if (height > window.innerHeight / 2) {
+                    height = window.innerHeight / 2;
+                    this.style.overflowY = 'scroll';
+                } else {
+                    this.style.overflowY = 'hidden';
+                }
+                if (height > this.clientHeight) this.style.height = `${height}px`;
+            });
+
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape') state.controller.abort();
+            });
+
+            ui.newChatButton.addEventListener('click', () => {
+                if (state.receiving) state.controller.abort();
+                ui.messageEl.value = startMessage;
+                ui.messageEl.style.height = 'auto';
+                createNewChat();
+            });
+
+            ui.saveChatButton.addEventListener('click', () => {
+                const current = chats.find(c => c.id === currentChatId);
+                if (!current) return;
+                const jsonData = JSON.stringify({ title: current.title, data: current.data });
+                const blob = new Blob([jsonData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${current.title.replace(/\s/g, '_')}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            });
+
+            ui.loadChatButton.addEventListener('click', () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'application/json';
+                input.addEventListener('change', () => {
+                    const file = input.files[0];
+                    const reader = new FileReader();
+                    reader.addEventListener('load', () => {
+                        try {
+                            let loaded = JSON.parse(reader.result);
+                            let data = loaded.data;
+                            if (!data && loaded.rootAlternatives) {
+                                data = loaded.rootAlternatives;
+                            } else if (!data && typeof loaded === 'object') {
+                                data = loaded;
+                            }
+                            const id = Date.now().toString();
+                            const title = loaded.title || 'Imported Chat';
+                            chats.push({ id, title, data });
+                            switchChat(id);
+                            updateChatList();
+                            persistChats();
+                        } catch (error) {
+                            console.error('Failed to parse loaded chatlog:', error);
+                            alert('Invalid chatlog file.');
+                        }
+                    });
+                    reader.readAsText(file);
+                });
+                input.click();
+            });
+
+            ui.temperatureValueEl.textContent = ui.temperatureEl.value;
+            ui.temperatureEl.addEventListener('input', () => ui.temperatureValueEl.textContent = ui.temperatureEl.value);
+
+            ui.topPValueEl.textContent = ui.topPEl.value;
+            ui.topPEl.addEventListener('input', () => ui.topPValueEl.textContent = ui.topPEl.value);
+
+            ui.endpointEl.addEventListener('input', () => localStorage.setItem('gptChat_endpoint', ui.endpointEl.value));
+
+            ui.settingsButton.addEventListener('click', () => ui.settingsEl.classList.toggle('open'));
+
+            document.getElementById('refreshModelsButton').addEventListener('click', async () => await loadModels(ui, state));
+
+            // Save selected model to localStorage on change.
+            const saveModel = () => {
+                let model = document.querySelector('input[name="model"]:checked')?.value;
+                if (model === 'custom') model = document.getElementById('custom_model')?.value.trim();
+                if (model) localStorage.setItem('gptChat_model', model);
+            };
+
+            document.getElementById('modelsFieldset').addEventListener('change', saveModel);
+            document.getElementById('custom_model')?.addEventListener('input', () => {
+                if (document.getElementById('model_custom')?.checked) saveModel();
+            });
+
+            document.getElementById('login-btn').addEventListener('click', async () => {
+                const key = ui.apiKeyEl.value.trim();
+                localStorage.setItem('gptChat_apiKey', key);
+                state.apiKey = key;
+                localStorage.setItem('gptChat_endpoint', ui.endpointEl.value);
+                if (await loadModels(ui, state)) {
+                    showLogout();
+                }
+            });
+
+            document.getElementById('logout-btn').addEventListener('click', () => {
+                localStorage.removeItem('gptChat_apiKey');
+                localStorage.removeItem('gptChat_models');
+                state.apiKey = '';
+                ui.apiKeyEl.value = '';
+                ui.endpointEl.value = defaultEndpoint;
+                localStorage.setItem('gptChat_endpoint', defaultEndpoint);
+                showLogin();
+                populateModels(ui, []);
+            });
+
+            document.getElementById('toggleChatList').addEventListener('click', () => {
+                const cl = document.getElementById('chatListContainer');
+                cl.style.display = cl.style.display === 'block' ? 'none' : 'block';
+            });
+        }
+
         setUpEventListeners(ui, state, createNewChat, persistChats, switchChat, updateChatList);
     });
-
-    // Sets up event listeners for UI interactions.
-    function setUpEventListeners(ui, state, createNewChat, persistChats, switchChat, updateChatList) {
-        ui.submitButton.addEventListener('click', () => {
-            if (state.receiving) {
-                state.controller.abort();
-                return;
-            }
-
-            let model = document.querySelector('input[name="model"]:checked')?.value;
-            if (model === 'custom') {
-                model = document.getElementById('custom_model').value.trim();
-                if (!model) return alert('Please enter a custom model ID.');
-            }
-
-            openaiChat(ui.messageEl.value, ui.chatlogEl.chatlog, model, Number(ui.temperatureEl.value), Number(ui.topPEl.value), document.querySelector('input[name="user_role"]:checked').value, ui, state);
-            document.getElementById('user').checked = true;
-            ui.messageEl.value = '';
-            ui.messageEl.style.height = 'auto';
-        });
-
-        ui.messageEl.addEventListener('keydown', event => {
-            if (event.keyCode === 13 && (event.shiftKey || event.ctrlKey || event.altKey)) {
-                event.preventDefault();
-                ui.submitButton.click();
-            }
-        });
-
-        ui.messageEl.addEventListener('input', function () {
-            this.style.height = 'auto';
-            let height = this.scrollHeight - parseInt(getComputedStyle(this).paddingTop) - parseInt(getComputedStyle(this).paddingBottom);
-            if (height > window.innerHeight / 2) {
-                height = window.innerHeight / 2;
-                this.style.overflowY = 'scroll';
-            } else {
-                this.style.overflowY = 'hidden';
-            }
-            if (height > this.clientHeight) this.style.height = `${height}px`;
-        });
-
-        document.addEventListener('keydown', event => {
-            if (event.key === 'Escape') state.controller.abort();
-        });
-
-        ui.newChatButton.addEventListener('click', () => {
-            if (state.receiving) state.controller.abort();
-            ui.messageEl.value = startMessage;
-            ui.messageEl.style.height = 'auto';
-            createNewChat();
-        });
-
-        ui.saveChatButton.addEventListener('click', () => {
-            const current = chats.find(c => c.id === currentChatId);
-            if (!current) return;
-            const jsonData = JSON.stringify({ title: current.title, data: current.data });
-            const blob = new Blob([jsonData], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${current.title.replace(/\s/g, '_')}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        });
-
-        ui.loadChatButton.addEventListener('click', () => {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'application/json';
-            input.addEventListener('change', () => {
-                const file = input.files[0];
-                const reader = new FileReader();
-                reader.addEventListener('load', () => {
-                    try {
-                        let loaded = JSON.parse(reader.result);
-                        let data = loaded.data;
-                        if (!data && loaded.rootAlternatives) {
-                            data = loaded.rootAlternatives;
-                        } else if (!data && typeof loaded === 'object') {
-                            data = loaded;
-                        }
-                        const id = Date.now().toString();
-                        const title = loaded.title || 'Imported Chat';
-                        chats.push({ id, title, data });
-                        switchChat(id);
-                        updateChatList();
-                        persistChats();
-                    } catch (error) {
-                        console.error('Failed to parse loaded chatlog:', error);
-                        alert('Invalid chatlog file.');
-                    }
-                });
-                reader.readAsText(file);
-            });
-            input.click();
-        });
-
-        ui.temperatureValueEl.textContent = ui.temperatureEl.value;
-        ui.temperatureEl.addEventListener('input', () => ui.temperatureValueEl.textContent = ui.temperatureEl.value);
-
-        ui.topPValueEl.textContent = ui.topPEl.value;
-        ui.topPEl.addEventListener('input', () => ui.topPValueEl.textContent = ui.topPEl.value);
-
-        ui.endpointEl.addEventListener('input', () => localStorage.setItem('gptChat_endpoint', ui.endpointEl.value));
-
-        ui.settingsButton.addEventListener('click', () => ui.settingsEl.classList.toggle('open'));
-
-        document.getElementById('refreshModelsButton').addEventListener('click', async () => await loadModels(ui, state));
-
-        // Save selected model to localStorage on change.
-        const saveModel = () => {
-            let model = document.querySelector('input[name="model"]:checked')?.value;
-            if (model === 'custom') model = document.getElementById('custom_model')?.value.trim();
-            if (model) localStorage.setItem('gptChat_model', model);
-        };
-
-        document.getElementById('modelsFieldset').addEventListener('change', saveModel);
-        document.getElementById('custom_model')?.addEventListener('input', () => {
-            if (document.getElementById('model_custom')?.checked) saveModel();
-        });
-
-        document.getElementById('login-btn').addEventListener('click', async () => {
-            const key = ui.apiKeyEl.value.trim();
-            localStorage.setItem('gptChat_apiKey', key);
-            state.apiKey = key;
-            localStorage.setItem('gptChat_endpoint', ui.endpointEl.value);
-            if (await loadModels(ui, state)) {
-                showLogout();
-            }
-        });
-
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            localStorage.removeItem('gptChat_apiKey');
-            localStorage.removeItem('gptChat_models');
-            state.apiKey = '';
-            ui.apiKeyEl.value = '';
-            ui.endpointEl.value = defaultEndpoint;
-            localStorage.setItem('gptChat_endpoint', defaultEndpoint);
-            showLogin();
-            populateModels(ui, []);
-        });
-
-        document.getElementById('toggleChatList').addEventListener('click', () => {
-            const cl = document.getElementById('chatListContainer');
-            cl.style.display = cl.style.display === 'block' ? 'none' : 'block';
-        });
-    }
 }());
