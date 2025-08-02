@@ -14,6 +14,8 @@ export const hooks = {
     onModifySystemPrompt: [] // Called to modify the system prompt before API call. Args: (systemContent) => modifiedSystemContent.
 };
 
+window.hooks = hooks; // TODO: only for testing: remove
+
 export function registerPlugin(plugin) {
     Object.entries(plugin.hooks || {}).forEach(([hookName, fn]) => {
         if (hooks[hookName]) {

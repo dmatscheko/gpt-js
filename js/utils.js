@@ -108,9 +108,6 @@ export async function generateAIResponse(chatbox, options = {}) {
         if (error.message.includes('API key')) {
             document.getElementById('settings').classList.add('open');
             setTimeout(() => document.getElementById('apiKey').focus(), 100);
-            alert('Invalid API key. Please check your settings.');
-        } else {
-            alert(`Chat error: ${error.message}`);
         }
         const lastMessage = chatbox.chatlog.getLastMessage();
         if (lastMessage.value === null) {
@@ -165,25 +162,21 @@ export async function submitUserMessage(message, userRole, chatbox) {
     chatbox.update();
     await generateAIResponse(chatbox);
 }
-
 // Generates a prompt suffix with the current date and time.
 export function getDatePrompt() {
     const now = new Date();
     return `\n\nKnowledge cutoff: none\nCurrent date: ${now.toISOString().slice(0, 10)}\nCurrent time: ${now.toTimeString().slice(0, 5)}`;
 }
-
 // Populates the models fieldset with the given models array.
 export function populateModels(ui, models) {
     const fieldset = document.getElementById('modelsFieldset');
     fieldset.querySelectorAll('input[type="radio"][name="model"], label[for^="model_"], br, p').forEach(el => el.remove());
-
     if (!models.length) {
         const p = document.createElement('p');
         p.textContent = 'No models available.';
         fieldset.appendChild(p);
         return;
     }
-
     models.forEach(model => {
         const safeId = model.id.replace(/[^a-z0-9_-]/gi, '_');
         const input = document.createElement('input');
@@ -198,7 +191,6 @@ export function populateModels(ui, models) {
         fieldset.appendChild(label);
         fieldset.appendChild(document.createElement('br'));
     });
-
     // Add custom model input option.
     const customInput = document.createElement('input');
     customInput.type = 'radio';
@@ -216,7 +208,6 @@ export function populateModels(ui, models) {
     fieldset.appendChild(customInput);
     fieldset.appendChild(customLabel);
     fieldset.appendChild(document.createElement('br'));
-
     // Restore previously selected model.
     const storedModel = localStorage.getItem('gptChat_model');
     if (storedModel) {
@@ -231,7 +222,6 @@ export function populateModels(ui, models) {
         if (defaultRadio) defaultRadio.checked = true;
     }
 }
-
 // Loads models from local storage and populates the UI if available.
 export function loadModelsFromStorage(ui) {
     const storedModels = localStorage.getItem('gptChat_models');
@@ -248,7 +238,6 @@ export function loadModelsFromStorage(ui) {
     }
     return false;
 }
-
 // Loads available models from the API and populates the UI.
 export async function loadModels(ui, state) {
     const modelsUrl = ui.endpointEl.value.replace(/\/chat\/completions$/, '/models');
@@ -271,7 +260,7 @@ export async function loadModels(ui, state) {
         return true;
     } catch (err) {
         console.error('Failed to load models:', err);
-        alert(`Failed to load models: ${err.message}`);
+        hooks.onError.forEach(fn => fn(err));
         if (localStorage.getItem('gptChat_apiKey') !== null) {
             localStorage.removeItem('gptChat_apiKey');
             localStorage.removeItem('gptChat_models');
@@ -279,17 +268,14 @@ export async function loadModels(ui, state) {
             ui.apiKeyEl.value = '';
             showLogin();
             populateModels(ui, []);
-            alert('Session invalid, logged out.');
         }
         return false;
     }
 }
-
 export function showLogin() {
     document.getElementById('session-login').style.display = 'block';
     document.getElementById('session-logout').style.display = 'none';
 }
-
 export function showLogout() {
     document.getElementById('session-login').style.display = 'none';
     document.getElementById('session-logout').style.display = 'block';

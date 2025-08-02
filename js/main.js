@@ -6,6 +6,7 @@ import { hooks, registerPlugin } from './hooks.js';
 import { formattingPlugins } from './plugins/formatting.js';
 import { avatarsPlugin } from './plugins/avatars.js';
 import { mcpPlugin } from './plugins/mcp.js';
+import { errorBubblePlugin } from './plugins/error-bubble.js';
 
 'use strict';
 
@@ -13,6 +14,7 @@ import { mcpPlugin } from './plugins/mcp.js';
     formattingPlugins.forEach(registerPlugin);
     registerPlugin(avatarsPlugin);
     registerPlugin(mcpPlugin);
+    registerPlugin(errorBubblePlugin);
 
     document.addEventListener('DOMContentLoaded', async () => {
         const state = {
@@ -322,8 +324,7 @@ import { mcpPlugin } from './plugins/mcp.js';
                             updateChatList();
                             persistChats();
                         } catch (error) {
-                            console.error('Failed to parse loaded chatlog:', error);
-                            alert('Invalid chatlog file.');
+                            hooks.onError.forEach(fn => fn(error));
                         }
                     });
                     reader.readAsText(file);
