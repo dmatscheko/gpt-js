@@ -103,7 +103,7 @@ class Chatbox {
         msgTitleStrip.innerHTML = headerContent;
         el.appendChild(msgTitleStrip);
 
-        const formattedContent = this.#formatContent(message.value.content);
+        const formattedContent = this.#formatContent(message.value.content, message);
         if (formattedContent) {
             el.appendChild(formattedContent);
         }
@@ -180,7 +180,7 @@ class Chatbox {
     }
 
     // Formats message content with Markdown, syntax highlighting, and LaTeX rendering.
-    #formatContent(text) {
+    #formatContent(text, message) {
         if (!text) return null;
         try {
             text = text.trim();
@@ -192,7 +192,7 @@ class Chatbox {
             wrapper.classList.add('content');
             wrapper.innerHTML = html;
 
-            hooks.onPostFormatContent.forEach(fn => { fn(wrapper); });
+            hooks.onPostFormatContent.forEach(fn => { fn(wrapper, message); });
 
             return wrapper;
         } catch (error) {

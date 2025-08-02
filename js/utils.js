@@ -3,16 +3,140 @@ import { messageSubmit, messageStop } from './config.js';
 
 'use strict';
 
-// Fetches a chat completion from the OpenAI API with streaming support.
-export async function openaiChat(message, chatlog, model, temperature, topP, userRole, ui, state) {
+// Streams an OpenAI API chat completion into the last (null) message in the chatlog.
+export async function streamAPIResponse(payload, chatbox) {
+    const state = chatbox.state;
+    const chatlog = chatbox.chatlog;
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    if (state.apiKey) {
+        headers['Authorization'] = `Bearer ${state.apiKey}`;
+    }
+
+    const endpoint = document.getElementById('endpoint').value;
+    const response = await fetch(endpoint, {
+        signal: state.controller.signal,
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) throw new Error(`API error: ${response.statusText} (${response.status})`);
+
+    const reader = response.body.getReader();
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const valueStr = new TextDecoder().decode(value);
+        if (valueStr.startsWith('{')) {
+            const data = JSON.parse(valueStr);
+            if (data.error) throw new Error(data.error.message);
+        }
+        const chunks = valueStr.split('\n');
+        let delta = '';
+        chunks.forEach(chunk => {
+            if (!chunk.startsWith('data: ')) return;
+            chunk = chunk.substring(6);
+            if (chunk === '' || chunk === '[DONE]') return;
+            const data = JSON.parse(chunk);
+            if (data.error) throw new Error(data.error.message);
+            delta += data.choices[0].delta.content || '';
+        });
+
+        if (delta === '') continue;
+
+        hooks.onChunkReceived.forEach(fn => fn(delta));
+
+        const lastMessage = chatlog.getLastMessage();
+        if (lastMessage.value === null) {
+            lastMessage.value = { role: 'assistant', content: delta };
+        } else {
+            lastMessage.value.content += delta;
+        }
+        lastMessage.cache = null;
+        chatbox.update();
+    }
+
+    const lastMessage = chatlog.getLastMessage();
+    hooks.onMessageComplete.forEach(fn => fn(lastMessage, chatbox));
+}
+
+// Generates an AI response by preparing payload, streaming from API via streamAPIResponse(), and handling state/errors/metadata.
+export async function generateAIResponse(chatbox, options = {}) {
+    const state = chatbox.state;
+    if (state.receiving) return; // Caller should handle abort if needed
+    let model = options.model || document.querySelector('input[name="model"]:checked')?.value;
+    if (model === 'custom') {
+        model = (options.model || document.getElementById('custom_model').value.trim());
+        if (!model) throw new Error('Please enter a custom model ID.');
+    }
+    if (!model) throw new Error('Please select a model.');
+    const temperature = options.temperature ?? Number(document.getElementById('temperature').value);
+    const topP = options.top_p ?? Number(document.getElementById('topP').value);
+    state.receiving = true;
+    const submitButton = document.getElementById('submitButton');
+    submitButton.innerHTML = messageStop;
+    try {
+        let payload = {
+            model,
+            messages: chatbox.chatlog.getActiveMessageValues(),
+            temperature,
+            top_p: topP,
+            stream: true
+        };
+        if (payload.messages.length <= 1) return;
+        if (payload.messages[0]?.role === 'system') {
+            let systemContent = payload.messages[0].content;
+            for (let fn of hooks.onModifySystemPrompt) {
+                systemContent = fn(systemContent) || systemContent;
+            }
+            payload.messages[0].content = systemContent;
+        }
+        for (let fn of hooks.beforeApiCall) {
+            const modified = fn(payload);
+            if (modified) payload = modified;
+        }
+        await streamAPIResponse(payload, chatbox);
+    } catch (error) {
+        console.error('AI response error:', error);
+        hooks.onError.forEach(fn => fn(error));
+        if (error.name === 'AbortError') {
+            state.controller = new AbortController();
+            return;
+        }
+        if (error.message.includes('API key')) {
+            document.getElementById('settings').classList.add('open');
+            setTimeout(() => document.getElementById('apiKey').focus(), 100);
+            alert('Invalid API key. Please check your settings.');
+        } else {
+            alert(`Chat error: ${error.message}`);
+        }
+        const lastMessage = chatbox.chatlog.getLastMessage();
+        if (lastMessage.value === null) {
+            lastMessage.value = { role: 'assistant', content: `${error}` };
+            hooks.afterMessageAdd.forEach(fn => fn(lastMessage));
+        } else {
+            lastMessage.value.content += `\n\n${error}`;
+        }
+        lastMessage.cache = null;
+    } finally {
+        state.receiving = false;
+        submitButton.innerHTML = messageSubmit;
+        const lastMessage = chatbox.chatlog.getLastMessage();
+        if (lastMessage.value !== null) {
+            lastMessage.metadata = { model, temperature, top_p: topP };
+        }
+        chatbox.update();
+    }
+}
+
+// Submits a user/system/assistant message to the chatlog and generates an AI response via generateAIResponse() if applicable.
+export async function submitUserMessage(message, userRole, chatbox) {
+    const state = chatbox.state;
     if (!state.regenerateLastAnswer && !message) return;
     if (state.receiving) return;
-    if (!model) {
-        alert('Please select a model.');
-        return;
-    }
-    state.receiving = true;
-
+    const chatlog = chatbox.chatlog;
     if (userRole === 'assistant') {
         let modifiedContent = message;
         for (let fn of hooks.beforeUserMessageAdd) {
@@ -22,139 +146,24 @@ export async function openaiChat(message, chatlog, model, temperature, topP, use
         }
         const newMessage = chatlog.addMessage({ role: userRole, content: modifiedContent });
         hooks.afterMessageAdd.forEach(fn => fn(newMessage));
-        ui.chatlogEl.update();
-        state.receiving = false;
+        chatbox.update();
         return;
     }
-
-    ui.submitButton.innerHTML = messageStop;
-    let entryCreated = false;
-    try {
-        if (!state.regenerateLastAnswer) {
-            message = message.trim();
-            let modifiedContent = message;
-            for (let fn of hooks.beforeUserMessageAdd) {
-                const result = fn(modifiedContent, userRole);
-                if (result === false) throw new Error('Message addition cancelled by plugin');
-                if (typeof result === 'string') modifiedContent = result;
-            }
-            const newMessage = chatlog.addMessage({ role: userRole, content: modifiedContent });
-            hooks.afterMessageAdd.forEach(fn => fn(newMessage));
-            chatlog.addMessage(null);
+    if (!state.regenerateLastAnswer) {
+        message = message.trim();
+        let modifiedContent = message;
+        for (let fn of hooks.beforeUserMessageAdd) {
+            const result = fn(modifiedContent, userRole);
+            if (result === false) return;
+            if (typeof result === 'string') modifiedContent = result;
         }
-        state.regenerateLastAnswer = false;
-        ui.chatlogEl.update();
-
-        let payload = {
-            model,
-            messages: chatlog.getActiveMessageValues(),
-            temperature,
-            top_p: topP,
-            stream: true
-        };
-
-        if (payload.messages.length <= 1) return;
-
-        for (let fn of hooks.beforeApiCall) {
-            const modified = fn(payload);
-            if (modified) payload = modified;
-        }
-
-        const headers = {
-            'Content-Type': 'application/json'
-        };
-        if (state.apiKey) {
-            headers['Authorization'] = `Bearer ${state.apiKey}`;
-        }
-
-        const response = await fetch(ui.endpointEl.value, {
-            signal: state.controller.signal,
-            method: 'POST',
-            headers,
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) throw new Error(`API error: ${response.statusText} (${response.status})`);
-
-        const reader = response.body.getReader();
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const valueStr = new TextDecoder().decode(value);
-            if (valueStr.startsWith('{')) {
-                const data = JSON.parse(valueStr);
-                if (data.error) throw new Error(data.error.message);
-            }
-            const chunks = valueStr.split('\n');
-            let delta = '';
-            chunks.forEach(chunk => {
-                if (!chunk.startsWith('data: ')) return;
-                chunk = chunk.substring(6);
-                if (chunk === '' || chunk === '[DONE]') return;
-                let data;
-                try {
-                    data = JSON.parse(chunk);
-                } catch (err) {
-                    console.error('JSON parse error in chunk:', err, chunk);
-                    return;
-                }
-                if (data.error) throw new Error(data.error.message);
-                delta += data.choices[0].delta.content || '';
-            });
-
-            if (delta === '') continue;
-
-            hooks.onChunkReceived.forEach(fn => fn(delta));
-
-            if (!entryCreated) {
-                const lastMessage = chatlog.addMessage({ role: 'assistant', content: delta });
-                entryCreated = true;
-                lastMessage.metadata = { model, temperature, top_p: topP };
-                hooks.afterMessageAdd.forEach(fn => fn(lastMessage));
-            } else {
-                const lastMessage = chatlog.getLastMessage();
-                lastMessage.value.content += delta;
-                lastMessage.cache = null;
-            }
-            ui.chatlogEl.update();
-        }
-
-        if (entryCreated) {
-            const lastMessage = chatlog.getLastMessage();
-            hooks.onMessageComplete.forEach(fn => fn(lastMessage));
-        }
-    } catch (error) {
-        console.error('OpenAI chat error:', error);
-        hooks.onError.forEach(fn => fn(error));
-        if (error.name === 'AbortError') {
-            state.controller = new AbortController();
-            return;
-        }
-        if (error.message.includes('API key')) {
-            ui.settingsEl.classList.add('open');
-            setTimeout(() => ui.apiKeyEl.focus(), 100);
-            alert('Invalid API key. Please check your settings.');
-        } else {
-            alert(`Chat error: ${error.message}`);
-        }
-
-        if (!entryCreated) {
-            const errorMessage = chatlog.addMessage({ role: 'assistant', content: `${error}` });
-            entryCreated = true;
-            hooks.afterMessageAdd.forEach(fn => fn(errorMessage));
-        } else {
-            const lastMessage = chatlog.getLastMessage();
-            lastMessage.value.content += `\n\n${error}`;
-        }
-    } finally {
-        state.receiving = false;
-        ui.submitButton.innerHTML = messageSubmit;
-        if (entryCreated) {
-            const lastMessage = chatlog.getLastMessage();
-            lastMessage.metadata = { model, temperature, top_p: topP };
-        }
-        ui.chatlogEl.update();
+        const newMessage = chatlog.addMessage({ role: userRole, content: modifiedContent });
+        hooks.afterMessageAdd.forEach(fn => fn(newMessage));
+        chatlog.addMessage(null);
     }
+    state.regenerateLastAnswer = false;
+    chatbox.update();
+    await generateAIResponse(chatbox);
 }
 
 // Generates a prompt suffix with the current date and time.

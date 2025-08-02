@@ -1,16 +1,18 @@
 import { Chatbox } from './chatbox.js';
 import { Chatlog, Alternatives } from './chatlog.js';
 import { firstPrompt, startMessage, defaultEndpoint, messageSubmit, messageStop } from './config.js';
-import { openaiChat, populateModels, loadModels, loadModelsFromStorage, getDatePrompt, showLogin, showLogout } from './utils.js';
+import { submitUserMessage, populateModels, loadModels, loadModelsFromStorage, getDatePrompt, showLogin, showLogout } from './utils.js';
 import { hooks, registerPlugin } from './hooks.js';
 import { formattingPlugins } from './plugins/formatting.js';
 import { avatarsPlugin } from './plugins/avatars.js';
+import { mcpPlugin } from './plugins/mcp.js';
 
 'use strict';
 
 (function () {
     formattingPlugins.forEach(registerPlugin);
     registerPlugin(avatarsPlugin);
+    registerPlugin(mcpPlugin);
 
     document.addEventListener('DOMContentLoaded', async () => {
         const state = {
@@ -247,13 +249,7 @@ import { avatarsPlugin } from './plugins/avatars.js';
                     return;
                 }
 
-                let model = document.querySelector('input[name="model"]:checked')?.value;
-                if (model === 'custom') {
-                    model = document.getElementById('custom_model').value.trim();
-                    if (!model) return alert('Please enter a custom model ID.');
-                }
-
-                openaiChat(ui.messageEl.value, ui.chatlogEl.chatlog, model, Number(ui.temperatureEl.value), Number(ui.topPEl.value), document.querySelector('input[name="user_role"]:checked').value, ui, state);
+                submitUserMessage(ui.messageEl.value, document.querySelector('input[name="user_role"]:checked').value, ui.chatlogEl);
                 document.getElementById('user').checked = true;
                 ui.messageEl.value = '';
                 ui.messageEl.style.height = 'auto';
@@ -343,8 +339,12 @@ import { avatarsPlugin } from './plugins/avatars.js';
 
             ui.endpointEl.addEventListener('input', () => localStorage.setItem('gptChat_endpoint', ui.endpointEl.value));
 
-            ui.settingsButton.addEventListener('click', () => ui.settingsEl.classList.toggle('open'));
-
+            ui.settingsButton.addEventListener('click', () => {
+                ui.settingsEl.classList.toggle('open');
+                if (ui.settingsEl.classList.contains('open')) {
+                    hooks.onSettingsRender.forEach(fn => fn(ui.settingsEl));
+                }
+            });
             document.getElementById('refreshModelsButton').addEventListener('click', async () => await loadModels(ui, state));
 
             // Save selected model to localStorage on change.
