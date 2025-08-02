@@ -1,4 +1,5 @@
 import { ClipBadge } from '../clipbadge.js';
+import { hooks } from '../hooks.js';
 
 'use strict';
 
@@ -40,7 +41,7 @@ export const formattingPlugins = [
                                 value = highlighted.value;
                             }
                         } catch (error) {
-                            console.error('Highlight error:', error, code);
+                            hooks.onError.forEach(fn => fn(error));
                         }
                         return `<pre class="hljs ${this.langPrefix}${language}" data-plaintext="${encodeURIComponent(code.trim())}"><code>${value}</code></pre>`;
                     }

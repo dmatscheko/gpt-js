@@ -1,3 +1,5 @@
+import { hooks } from './hooks.js';
+
 'use strict';
 
 // Provides copy-to-clipboard badges for code blocks and tables.
@@ -123,7 +125,7 @@ class ClipBadge {
                 const clipboardData = { 'text/plain': new Blob([textToCopy], { type: 'text/plain' }) };
                 if (htmlText) clipboardData['text/html'] = new Blob([htmlText], { type: 'text/html' });
                 navigator.clipboard.write([new ClipboardItem(clipboardData)]).then(setCopied).catch(err => {
-                    console.error('Clipboard API failed:', err);
+                    hooks.onError.forEach(fn => fn(err));
                 });
             } else {
                 const textArea = document.createElement('textarea');
@@ -136,9 +138,9 @@ class ClipBadge {
                 textArea.select();
                 try {
                     if (document.execCommand('copy')) setCopied();
-                    else console.error('Fallback copy failed');
+                    else hooks.onError.forEach(fn => fn(new Error('Fallback copy failed')));
                 } catch (err) {
-                    console.error('Fallback copy error:', err);
+                    hooks.onError.forEach(fn => fn(err));
                 }
                 document.body.removeChild(textArea);
             }

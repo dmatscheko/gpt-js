@@ -1,4 +1,5 @@
 'use strict';
+
 let timeoutId = null;
 export const errorBubblePlugin = {
     name: 'error-bubble',
@@ -18,6 +19,7 @@ export const errorBubblePlugin = {
         }
     }
 };
+
 function hideBubble() {
     const bubble = document.getElementById('error-bubble');
     if (!bubble) return;

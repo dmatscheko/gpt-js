@@ -196,7 +196,7 @@ class Chatbox {
 
             return wrapper;
         } catch (error) {
-            console.error('Formatting error:', error);
+            hooks.onError.forEach(fn => fn(error));
             const wrapper = document.createElement('div');
             wrapper.classList.add('content');
             wrapper.innerHTML = `<p>Error formatting content: ${error.message}</p><pre>${text}</pre>`;

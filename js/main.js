@@ -231,12 +231,14 @@ import { errorBubblePlugin } from './plugins/error-bubble.js';
             } else {
                 ui.settingsEl.classList.add('open');
                 setTimeout(() => ui.apiKeyEl.focus(), 100);
+                hooks.onError.forEach(fn => fn(new Error('Please enter correct API Endpoint and API Key.')));
             }
         } else {
             showLogin();
             populateModels(ui, []);
             ui.settingsEl.classList.add('open');
             setTimeout(() => ui.endpointEl.focus(), 100);
+            hooks.onError.forEach(fn => fn(new Error('Please enter correct API Endpoint and API Key.')));
         }
 
         ui.endpointEl.value = localStorage.getItem('gptChat_endpoint') || defaultEndpoint;

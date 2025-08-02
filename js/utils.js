@@ -69,9 +69,15 @@ export async function generateAIResponse(chatbox, options = {}) {
     let model = options.model || document.querySelector('input[name="model"]:checked')?.value;
     if (model === 'custom') {
         model = (options.model || document.getElementById('custom_model').value.trim());
-        if (!model) throw new Error('Please enter a custom model ID.');
+        if (!model) {
+            hooks.onError.forEach(fn => fn(new Error('Please enter a custom model ID.')));
+            return;
+        }
     }
-    if (!model) throw new Error('Please select a model.');
+    if (!model) {
+        hooks.onError.forEach(fn => fn(new Error('Please select a model.')));
+        return;
+    }
     const temperature = options.temperature ?? Number(document.getElementById('temperature').value);
     const topP = options.top_p ?? Number(document.getElementById('topP').value);
     state.receiving = true;
@@ -99,13 +105,12 @@ export async function generateAIResponse(chatbox, options = {}) {
         }
         await streamAPIResponse(payload, chatbox);
     } catch (error) {
-        console.error('AI response error:', error);
-        hooks.onError.forEach(fn => fn(error));
         if (error.name === 'AbortError') {
             state.controller = new AbortController();
             return;
         }
-        if (error.message.includes('API key')) {
+        hooks.onError.forEach(fn => fn(error));
+        if (error.message.includes('API key')) { // TODO: does not work - error is (401)
             document.getElementById('settings').classList.add('open');
             setTimeout(() => document.getElementById('apiKey').focus(), 100);
         }
@@ -162,11 +167,13 @@ export async function submitUserMessage(message, userRole, chatbox) {
     chatbox.update();
     await generateAIResponse(chatbox);
 }
+
 // Generates a prompt suffix with the current date and time.
 export function getDatePrompt() {
     const now = new Date();
     return `\n\nKnowledge cutoff: none\nCurrent date: ${now.toISOString().slice(0, 10)}\nCurrent time: ${now.toTimeString().slice(0, 5)}`;
 }
+
 // Populates the models fieldset with the given models array.
 export function populateModels(ui, models) {
     const fieldset = document.getElementById('modelsFieldset');
@@ -222,6 +229,7 @@ export function populateModels(ui, models) {
         if (defaultRadio) defaultRadio.checked = true;
     }
 }
+
 // Loads models from local storage and populates the UI if available.
 export function loadModelsFromStorage(ui) {
     const storedModels = localStorage.getItem('gptChat_models');
@@ -230,7 +238,7 @@ export function loadModelsFromStorage(ui) {
         try {
             models = JSON.parse(storedModels);
         } catch (err) {
-            console.error('Failed to parse stored models:', err);
+            hooks.onError.forEach(fn => fn(err));
             return false;
         }
         populateModels(ui, models);
@@ -238,6 +246,7 @@ export function loadModelsFromStorage(ui) {
     }
     return false;
 }
+
 // Loads available models from the API and populates the UI.
 export async function loadModels(ui, state) {
     const modelsUrl = ui.endpointEl.value.replace(/\/chat\/completions$/, '/models');
@@ -259,7 +268,6 @@ export async function loadModels(ui, state) {
         populateModels(ui, models);
         return true;
     } catch (err) {
-        console.error('Failed to load models:', err);
         hooks.onError.forEach(fn => fn(err));
         if (localStorage.getItem('gptChat_apiKey') !== null) {
             localStorage.removeItem('gptChat_apiKey');
@@ -272,10 +280,12 @@ export async function loadModels(ui, state) {
         return false;
     }
 }
+
 export function showLogin() {
     document.getElementById('session-login').style.display = 'block';
     document.getElementById('session-logout').style.display = 'none';
 }
+
 export function showLogout() {
     document.getElementById('session-login').style.display = 'none';
     document.getElementById('session-logout').style.display = 'block';
