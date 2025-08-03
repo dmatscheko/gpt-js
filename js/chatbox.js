@@ -99,7 +99,7 @@ class Chatbox {
         if (msgStat) {
             headerContent += `&nbsp;&nbsp;${msgStat}`;
         }
-        headerContent += `&nbsp;&nbsp;<button title="New Message" class="msg_mod-add-btn toolButton small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;&nbsp;<button title="Delete Message" class="msg_mod-del-btn toolButton small"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h4a1 1 0 1 1 0 2h-1.069l-.867 12.142A2 2 0 0 1 17.069 22H6.93a2 2 0 0 1-1.995-1.858L4.07 8H3a1 1 0 0 1 0-2h4V4zm2 2h6V4H9v2zM6.074 8l.857 12H17.07l.857-12H6.074zM10 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm4 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button></span><br><br>`;
+        headerContent += `&nbsp;&nbsp;<button title="New Message" class="msg_mod-add-btn toolButton small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;&nbsp;<button title="Edit Message" class="msg_mod-edit-btn toolButton small"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg></button>&nbsp;&nbsp;<button title="Delete Message" class="msg_mod-del-btn toolButton small"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h4a1 1 0 1 1 0 2h-1.069l-.867 12.142A2 2 0 0 1 17.069 22H6.93a2 2 0 0 1-1.995-1.858L4.07 8H3a1 1 0 0 1 0-2h4V4zm2 2h6V4H9v2zM6.074 8l.857 12H17.07l.857-12H6.074zM10 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm4 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button></span><br><br>`;
         msgTitleStrip.innerHTML = headerContent;
         el.appendChild(msgTitleStrip);
 
@@ -149,7 +149,13 @@ class Chatbox {
             }
             messageInput.focus();
         });
-
+        el.querySelector('.msg_mod-edit-btn').addEventListener('click', () => {
+            const messageInput = document.getElementById('messageInput');
+            messageInput.value = message.value.content.trim();
+            messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+            this.state.editingPos = pos;
+            messageInput.focus();
+        });
         el.querySelector('.msg_mod-del-btn').addEventListener('click', () => {
             const alternatives = this.chatlog.getNthAlternatives(pos);
             if (!alternatives) return;

@@ -36,6 +36,7 @@ import { errorBubblePlugin } from './plugins/error-bubble.js';
             regenerateLastAnswer: false,
             controller: new AbortController(),
             apiKey: localStorage.getItem('gptChat_apiKey') || '',
+            editingPos: null
         };
 
         let chats = [];

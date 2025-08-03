@@ -1,6 +1,7 @@
 'use strict';
 
 const toolsDescription = `
+
 ## Tools:
 
 You use tools via function calls to help you solve questions. Make sure to use the following format for function calls, including the <dma:function_call> and </dma:function_call> tags. Function call should follow the following XML-inspired format:
@@ -87,8 +88,7 @@ This component only takes one argument, which is "citation_id" and the value sho
      - \`citation_id\`: Citation Id : The id of the citation to render. Extract the citation_id from the previous web search or browse page tool call result which has the format of '[web:citation_id]'. (type: integer) (required)
 
 
-Interweave render components within your final response where appropriate to enrich the visual presentation. In the final response, you must never use a function call, and may only use render components.
-`;
+Interweave render components within your final response where appropriate to enrich the visual presentation. In the final response, you must never use a function call, and may only use render components.`;
 
 export const mcpPlugin = {
     name: 'mcp',
@@ -113,7 +113,7 @@ export const mcpPlugin = {
         },
         beforeApiCall: function (payload) {
             const mcpUrl = localStorage.getItem('gptChat_mcpServer');
-            if (mcpUrl && payload.messages[0].role === 'system') {
+            if (mcpUrl && payload.messages[0].role === 'system' && !payload.messages[0].content.includes('## Tools:')) { // TODO: improve that later
                 payload.messages[0].content += toolsDescription;
             }
             return payload;

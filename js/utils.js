@@ -132,6 +132,16 @@ export async function generateAIResponse(chatbox, options = {}) {
 // Submits a user/system/assistant message to the chatlog and generates an AI response via generateAIResponse() if applicable.
 export async function submitUserMessage(message, userRole, chatbox) {
     const state = chatbox.state;
+    if (state.editingPos !== null) {
+        const msg = chatbox.chatlog.getNthMessage(state.editingPos);
+        if (msg) {
+            msg.value.content = message.trim();
+            msg.cache = null;
+            chatbox.update();
+        }
+        state.editingPos = null;
+        return;
+    }
     if (!state.regenerateLastAnswer && !message) return;
     if (state.receiving) return;
     const chatlog = chatbox.chatlog;
