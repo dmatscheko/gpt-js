@@ -196,16 +196,23 @@ async function mcpJsonRpc(method, params = {}) {
         id: Math.floor(Math.random() * 1000000)
     };
 
-    const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    });
+    try {
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
 
-    if (!resp.ok) throw new Error(`MCP error: ${resp.statusText}`);
+        if (!resp.ok) throw new Error(`MCP error: ${resp.statusText}`);
 
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error.message || 'MCP call failed');
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error.message || 'MCP call failed');
 
-    return data.result;
+        return data.result;
+    } catch (error) {
+        throw new AggregateError(
+            [error],
+            `Failed to perform MCP JSON-RPC call.\nURL: ${url}, Method: ${method}, Params: ${JSON.stringify(params)}.\nOriginal error: ${error.message || 'Unknown'}.`
+        );
+    }
 }

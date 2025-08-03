@@ -1,39 +1,56 @@
 'use strict';
 
 let timeoutId = null;
+
 export const errorBubblePlugin = {
     name: 'error-bubble',
     hooks: {
         onError: function (...args) {
             if (args.length === 0) {
-                // Optional: Handle no arguments with a default message
                 args = ['Unknown error'];
             }
 
             const formattedParts = args.map(arg => {
                 if (arg instanceof Error) {
-                    // Use only the error message for user-facing display
                     return arg.message;
                 } else if (typeof arg === 'object' && arg !== null) {
-                    // Stringify objects
                     return JSON.stringify(arg, null, 2);
                 } else {
-                    // Convert primitives to strings
                     return String(arg);
                 }
             });
 
-            const message = formattedParts.join(' ');
             const bubble = document.getElementById('error-bubble');
             if (!bubble) return;
             const content = document.getElementById('error-bubble-content');
-            const messageEl = document.createElement('p');
-            messageEl.textContent = message;
-            content.appendChild(messageEl);
+            content.style.padding = '15px 5px 0 5px';
+            formattedParts.forEach(part => {
+                const messageEl = document.createElement('div');
+                messageEl.style.wordBreak = 'break-word';
+                messageEl.style.margin = '0 0 15px 0'; // Spacing between parts
+                messageEl.style.backgroundColor = '#772222a0';
+                messageEl.style.padding = '5px';
+                messageEl.style.borderRadius = '10px';
+
+                // Split the part into lines and create elements for each
+                const lines = part.split('\n');
+                lines.forEach((line, index) => {
+                    const lineEl = document.createElement('div');
+                    lineEl.textContent = line;
+                    lineEl.style.whiteSpace = 'pre-wrap';
+                    if (index < lines.length - 1) {
+                        lineEl.style.marginBottom = '10px';
+                    }
+                    messageEl.appendChild(lineEl);
+                });
+
+                content.appendChild(messageEl);
+            });
+
             bubble.style.display = 'block';
             bubble.classList.remove('hiding');
             if (timeoutId) clearTimeout(timeoutId);
-            timeoutId = setTimeout(hideBubble, 10000);
+            timeoutId = setTimeout(hideBubble, 20000);
         }
     }
 };
