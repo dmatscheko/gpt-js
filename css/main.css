@@ -24,7 +24,6 @@ html, body {
     padding: 12px;
     text-align: center;
 }
-
 #header:has(+#mainContent #chatContainer>#chat>.message) {
     display: none;
 }
@@ -48,18 +47,15 @@ html, body {
     overflow: hidden;
     box-sizing: border-box;
 }
-
 #chatListWrapper {
     flex: 1;
     overflow-y: auto;
 }
-
 #chatList {
     margin: 0;
     padding: 0;
     list-style: none;
 }
-
 #chatControls {
     display: flex;
     justify-content: space-between;
@@ -68,12 +64,10 @@ html, body {
     padding-top: 10px;
     border-top: 1px solid #20212280;
 }
-
 #chatControls .left-buttons {
     display: flex;
     gap: 5px;
 }
-
 .chat-item {
     padding: 10px;
     cursor: pointer;
@@ -82,12 +76,10 @@ html, body {
     display: flex;
     align-items: center;
 }
-
 .chat-item.active {
     background-color: #40424f;
     border-radius: 5px;
 }
-
 .chat-item span {
     flex: 1;
     white-space: nowrap;
@@ -95,7 +87,6 @@ html, body {
     text-overflow: ellipsis;
     cursor: pointer; /* Indicates it's clickable for selection */
 }
-
 .chat-item input {
     flex: 1;
     background: transparent;
@@ -103,13 +94,11 @@ html, body {
     color: #fff;
     outline: none;
 }
-
 .chat-item button {
     margin-left: 5px;
     opacity: 0;
     transition: opacity 0.2s;
 }
-
 .chat-item:hover button {
     opacity: 1;
 }
@@ -139,7 +128,6 @@ html, body {
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
 }
-
 #inputContainer textarea {
     width: 100%;
     resize: none;
@@ -165,7 +153,6 @@ html, body {
     height: 29px;
     cursor: pointer;
 }
-
 .toolButton.small {
     background-color: #40424f60;
     border-radius: 4px;
@@ -181,12 +168,10 @@ html, body {
     bottom: 10px;
     left: 10px;
 }
-
 a {
     color: #aaa;
     text-decoration: none;
 }
-
 a:hover {
     text-decoration: underline;
 }
@@ -213,11 +198,9 @@ a:hover {
     bottom: 100px;
     right: 10px;
 }
-
 #settings.open {
     display: block;
 }
-
 #settings p {
     margin: 8px 0;
 }
@@ -230,21 +213,18 @@ a:hover {
     white-space: pre-wrap;
     overflow-wrap: break-word;
 }
-
 #chat > .message {
     margin: 8px;
     margin-bottom: 0;
     padding: 8px;
     border-radius: 16px;
 }
-
 #chat > .ping {
     background-color: #383333;
     margin-left: 40px;
     margin-right: 0;
     border-bottom-right-radius: 0;
 }
-
 #chat > .pong {
     background-color: #333338;
     margin-left: 0;
@@ -252,11 +232,9 @@ a:hover {
     border-bottom-left-radius: 0;
     margin-bottom: 8px;
 }
-
 #chat > .system {
     background-color: #583333;
 }
-
 #chat .avatar {
     width: 24px;
     height: 24px;
@@ -265,17 +243,14 @@ a:hover {
     margin-right: 8px;
     border-radius: 3px;
 }
-
 #chat p {
     margin-block-start: .3em;
     margin-block-end: .3em;
 }
-
 #chat pre {
     margin: .3em 0;
     white-space: pre-wrap;
 }
-
 #chat table {
     width: 100%;
     border-collapse: separate;
@@ -285,7 +260,6 @@ a:hover {
     border-radius: 5px;
     font-size: 14px;
 }
-
 #chat td,
 #chat th {
     padding: 5px 8px;
@@ -293,38 +267,30 @@ a:hover {
     border-top: 1px solid #d9d9e2;
     color: #d1d5db;
 }
-
 #chat th {
     text-align: left;
     background-color: #ececf033;
     color: #fff;
 }
-
 #chat th:first-of-type {
     border-top-left-radius: 5px;
 }
-
 #chat th:last-of-type {
     border-top-right-radius: 5px;
 }
-
 #chat tr:last-of-type td:first-of-type {
     border-bottom-left-radius: 5px;
 }
-
 #chat tr:last-of-type td:last-of-type {
     border-bottom-right-radius: 5px;
 }
-
 #chat .katex-html {
     display: none;
     font-size: 0;
 }
-
 #chat .katex-error {
     display: block;
 }
-
 #chat .hljs > svg,
 #chat .content img {
     max-width: 50%;
@@ -338,12 +304,10 @@ a:hover {
     width: 10px;
     background-color: #00000000;
 }
-
 ::-webkit-scrollbar-thumb {
     background-color: #ffffff15;
     border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
     background-color: #909090;
 }
@@ -352,7 +316,6 @@ a:hover {
 #session {
     text-align: right;
 }
-
 #session-login, #session-logout {
     display: none;
     margin-top: 8px;
@@ -370,11 +333,9 @@ a:hover {
 .nobreak {
     white-space: nowrap;
 }
-
 .right {
     float: right;
 }
-
 .clickable {
     cursor: pointer;
 }
@@ -390,11 +351,9 @@ a:hover {
     .only-desktop {
         display: none;
     }
-
     #colContainer {
         max-width: 100%;
     }
-
     #chatListContainer {
         position: absolute;
         left: 0;
@@ -411,7 +370,6 @@ a:hover {
     .only-mobile {
         display: none;
     }
-
     #chatListContainer {
         display: flex !important;
     }
@@ -422,34 +380,31 @@ a:hover {
     html, body {
         background-color: #fff;
     }
-
     #chatContainer {
         overflow: visible;
     }
-
     #inputContainer, #header, #buttons, #settings, #spacerBottom, #source, #chatListContainer {
         display: none;
     }
-
     #colContainer {
         max-width: 100%;
         width: 100%;
     }
-
     .clip-badge-copy-icon, button {
         display: none;
     }
-
     #chat > .ping {
         border: 1px solid #383333;
     }
-
     #chat > .pong {
         border: 1px solid #333338;
     }
-
     #chat > .system {
         border: 1px solid #583333;
+    }
+    #chat .hljs > svg,
+    #chat .content img {
+        max-width: 100%;
     }
 }
 
@@ -459,8 +414,66 @@ a:hover {
     opacity: 0.2;
     transition: opacity 0.2s;
 }
-
 .message:hover .msg_mod-add-btn, .message:hover .msg_mod-del-btn, .message:hover .msg_mod-prev-btn, .message:hover .msg_mod-next-btn {
     opacity: 1;
 }
 */
+
+/* Error bubble styles */
+#error-bubble {
+    display: none;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #ff3333a0;
+    color: #fff;
+    padding: 24px;
+    border-radius: 12px;
+    max-width: 400px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    animation: bubbleAppear 0.5s ease-out;
+}
+#error-bubble.hiding {
+    animation: bubbleDisappear 0.5s ease-out forwards;
+}
+@keyframes bubbleAppear {
+    from {
+        opacity: 0;
+        transform: translateX(20px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+@keyframes bubbleDisappear {
+    from {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(20px) scale(0.9);
+    }
+}
+#error-bubble-content {
+    margin: 0;
+    font-size: 16px;
+}
+#error-bubble-content p {
+    margin: 12px 0;
+}
+#error-bubble-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    font-size: 24px;
+}
+#error-bubble-close:hover {
+    color: #eee;
+}

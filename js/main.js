@@ -1,11 +1,12 @@
 import { Chatbox } from './chatbox.js';
 import { Chatlog, Alternatives } from './chatlog.js';
 import { firstPrompt, startMessage, defaultEndpoint, messageSubmit, messageStop } from './config.js';
-import { submitUserMessage, populateModels, loadModels, loadModelsFromStorage, getDatePrompt, showLogin, showLogout } from './utils.js';
+import { submitUserMessage, populateModels, loadModels, loadModelsFromStorage, getDatePrompt, showLogin, showLogout, triggerError } from './utils.js';
 import { hooks, registerPlugin } from './hooks.js';
 import { formattingPlugins } from './plugins/formatting.js';
 import { avatarsPlugin } from './plugins/avatars.js';
 import { mcpPlugin } from './plugins/mcp.js';
+import { errorBubblePlugin } from './plugins/error-bubble.js';
 
 'use strict';
 
@@ -13,6 +14,21 @@ import { mcpPlugin } from './plugins/mcp.js';
     formattingPlugins.forEach(registerPlugin);
     registerPlugin(avatarsPlugin);
     registerPlugin(mcpPlugin);
+    registerPlugin(errorBubblePlugin);
+
+    // Handle synchronous uncaught errors
+    window.addEventListener('error', function(event) {
+        const err = event.error || new Error(event.message);
+        triggerError(err);
+        event.preventDefault();
+    });
+
+    // Handle unhandled promise rejections
+    window.addEventListener('unhandledrejection', function(event) {
+        const err = event.reason;
+        triggerError(err);
+        event.preventDefault();
+    });
 
     document.addEventListener('DOMContentLoaded', async () => {
         const state = {
@@ -229,12 +245,14 @@ import { mcpPlugin } from './plugins/mcp.js';
             } else {
                 ui.settingsEl.classList.add('open');
                 setTimeout(() => ui.apiKeyEl.focus(), 100);
+                triggerError('Please login with correct API Endpoint and API Key.');
             }
         } else {
             showLogin();
             populateModels(ui, []);
             ui.settingsEl.classList.add('open');
             setTimeout(() => ui.endpointEl.focus(), 100);
+            triggerError('Please login with correct API Endpoint and API Key.');
         }
 
         ui.endpointEl.value = localStorage.getItem('gptChat_endpoint') || defaultEndpoint;
@@ -322,8 +340,7 @@ import { mcpPlugin } from './plugins/mcp.js';
                             updateChatList();
                             persistChats();
                         } catch (error) {
-                            console.error('Failed to parse loaded chatlog:', error);
-                            alert('Invalid chatlog file.');
+                            triggerError('Invalid chatlog file. Failed to parse loaded chatlog:', error);
                         }
                     });
                     reader.readAsText(file);

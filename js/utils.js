@@ -99,18 +99,16 @@ export async function generateAIResponse(chatbox, options = {}) {
         }
         await streamAPIResponse(payload, chatbox);
     } catch (error) {
-        console.error('AI response error:', error);
-        hooks.onError.forEach(fn => fn(error));
         if (error.name === 'AbortError') {
             state.controller = new AbortController();
             return;
         }
-        if (error.message.includes('API key')) {
+        if (error.message.includes('API key') || error.message.includes('(401)')) { // TODO: only either this or "triggerError('Please login with correct API Endpoint and API Key.');" in main.js is necessary!
             document.getElementById('settings').classList.add('open');
             setTimeout(() => document.getElementById('apiKey').focus(), 100);
-            alert('Invalid API key. Please check your settings.');
+            triggerError('Invalid API key. Please check your settings.');
         } else {
-            alert(`Chat error: ${error.message}`);
+            triggerError('Chat error:', error);
         }
         const lastMessage = chatbox.chatlog.getLastMessage();
         if (lastMessage.value === null) {
@@ -240,7 +238,7 @@ export function loadModelsFromStorage(ui) {
         try {
             models = JSON.parse(storedModels);
         } catch (err) {
-            console.error('Failed to parse stored models:', err);
+            triggerError('Failed to parse stored models:', err);
             return false;
         }
         populateModels(ui, models);
@@ -270,8 +268,7 @@ export async function loadModels(ui, state) {
         populateModels(ui, models);
         return true;
     } catch (err) {
-        console.error('Failed to load models:', err);
-        alert(`Failed to load models: ${err.message}`);
+        triggerError('Failed to load models:', err);
         if (localStorage.getItem('gptChat_apiKey') !== null) {
             localStorage.removeItem('gptChat_apiKey');
             localStorage.removeItem('gptChat_models');
@@ -279,7 +276,7 @@ export async function loadModels(ui, state) {
             ui.apiKeyEl.value = '';
             showLogin();
             populateModels(ui, []);
-            alert('Session invalid, logged out.');
+            triggerError('Session invalid, logged out.');
         }
         return false;
     }
@@ -293,4 +290,9 @@ export function showLogin() {
 export function showLogout() {
     document.getElementById('session-login').style.display = 'none';
     document.getElementById('session-logout').style.display = 'block';
+}
+
+export function triggerError(...args) {
+    console.error(...args);
+    hooks.onError.forEach(fn => fn(...args));
 }

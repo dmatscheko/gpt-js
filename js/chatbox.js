@@ -1,5 +1,5 @@
 import { firstPrompt } from './config.js';
-import { getDatePrompt } from './utils.js';
+import { getDatePrompt, triggerError } from './utils.js';
 import { hooks } from './hooks.js';
 
 'use strict';
@@ -196,7 +196,7 @@ class Chatbox {
 
             return wrapper;
         } catch (error) {
-            console.error('Formatting error:', error);
+            triggerError('Formatting error:', error);
             const wrapper = document.createElement('div');
             wrapper.classList.add('content');
             wrapper.innerHTML = `<p>Error formatting content: ${error.message}</p><pre>${text}</pre>`;
