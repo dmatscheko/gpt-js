@@ -299,6 +299,23 @@ a:hover {
     margin-right: auto;
 }
 
+/* Thinking area styles */
+#chat details.think {
+    background-color: #282b2e60;
+    padding: 8px;
+    border-radius: 5px;
+    margin: 8px 0;
+    border: 1px solid #ffffff15;
+}
+#chat details.think > summary {
+    cursor: pointer;
+    font-weight: bold;
+    color: #efeff0;
+}
+#chat details.think > .think-content {
+    padding: 8px 0;
+}
+
 /* Scrollbar customization */
 ::-webkit-scrollbar {
     width: 10px;

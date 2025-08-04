@@ -53,6 +53,18 @@ export const formattingPlugins = [
         }
     },
     {
+        name: 'think',
+        hooks: {
+            onFormatContent: function (text) {
+                // Replace complete <think>...</think> with collapsed details
+                text = text.replace(/&lt;think&gt;([\s\S]*?)&lt;\/think&gt;/g, '<details class="think"><summary>Thinking</summary><div class="think-content">$1</div></details>');
+                // Handle unmatched <think> at the end with open details
+                text = text.replace(/&lt;think&gt;([\s\S]*)$/, '<details open class="think"><summary>Thinking</summary><div class="think-content">$1</div></details>');
+                return text;
+            }
+        }
+    },
+    {
         name: 'katex',
         hooks: {
             onPostFormatContent: function (wrapper) {
