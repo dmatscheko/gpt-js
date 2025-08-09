@@ -1,21 +1,24 @@
+'use strict';
+
 import { firstPrompt } from './config.js';
 import { getDatePrompt, triggerError } from './utils.js';
+import { log } from './utils.js';
 import { hooks } from './hooks.js';
-
-'use strict';
 
 // Class responsible for displaying the chat messages in the UI.
 class Chatbox {
-    // Initializes the Chatbox with a chatlog, container element, and state.
-    constructor(chatlog, container, state) {
+    // Initializes the Chatbox with a chatlog, container element, and store.
+    constructor(chatlog, container, store) {
+        log(5, 'Chatbox: Constructor called');
         this.chatlog = chatlog;
         this.container = container;
-        this.state = state;
+        this.store = store;
         this.onUpdate = null;
     }
 
     // Updates the HTML content inside the chat window, optionally scrolling to the bottom.
     update(scroll = true) {
+        log(5, 'Chatbox: update called, scroll:', scroll);
         const shouldScrollDown = scroll && this.#isScrolledToBottom();
 
         const fragment = document.createDocumentFragment();
@@ -72,12 +75,14 @@ class Chatbox {
 
     // Checks if the chat container is scrolled to the bottom.
     #isScrolledToBottom() {
+        log(5, 'Chatbox: #isScrolledToBottom called');
         const { scrollHeight, clientHeight, scrollTop } = this.container.parentElement;
         return scrollHeight - clientHeight <= scrollTop + 5;
     }
 
     // Formats a single message as an HTML element.
     #formatMessage(message, pos, msgIdx, msgCnt) {
+        log(5, 'Chatbox: #formatMessage called for pos', pos);
         let type = 'ping';
         if (message.value.role === 'assistant') type = 'pong';
         const el = document.createElement('div');
@@ -122,7 +127,9 @@ class Chatbox {
 
     // Attaches event listeners to message elements for editing and regeneration.
     #attachMessageEvents(el, type, pos, message) {
+        log(5, 'Chatbox: #attachMessageEvents called for pos', pos);
         el.querySelector('.msg_mod-add-btn').addEventListener('click', async () => {
+            log(4, 'Chatbox: Add button clicked for pos', pos, 'type', type);
             const messageInput = document.getElementById('messageInput');
             let newMessage = null;
             if (type === 'ping') {
@@ -140,9 +147,9 @@ class Chatbox {
             if (alternative) alternative.addMessage(newMessage);
             this.update(false);
             if (type === 'pong') {
-                if (this.state.receiving) this.state.controller.abort();
+                if (this.store.get('receiving')) this.store.get('controller').abort();
                 setTimeout(() => {
-                    this.state.regenerateLastAnswer = true;
+                    this.store.set('regenerateLastAnswer', true);
                     document.getElementById('submitButton').click();
                 }, 100);
                 return;
@@ -150,13 +157,15 @@ class Chatbox {
             messageInput.focus();
         });
         el.querySelector('.msg_mod-edit-btn').addEventListener('click', () => {
+            log(4, 'Chatbox: Edit button clicked for pos', pos);
             const messageInput = document.getElementById('messageInput');
             messageInput.value = message.value.content.trim();
             messageInput.dispatchEvent(new Event('input', { bubbles: true }));
-            this.state.editingPos = pos;
+            this.store.set('editingPos', pos);
             messageInput.focus();
         });
         el.querySelector('.msg_mod-del-btn').addEventListener('click', () => {
+            log(4, 'Chatbox: Delete button clicked for pos', pos);
             const alternatives = this.chatlog.getNthAlternatives(pos);
             if (!alternatives) return;
             const activeIdx = alternatives.activeMessageIndex;
@@ -174,12 +183,15 @@ class Chatbox {
 
     // Attaches navigation events for switching between alternative messages.
     #attachNavigationEvents(el) {
+        log(5, 'Chatbox: #attachNavigationEvents called');
         el.querySelector('.msg_mod-prev-btn').addEventListener('click', () => {
+            log(4, 'Chatbox: Prev button clicked for pos', el.dataset.pos);
             this.chatlog.getNthAlternatives(el.dataset.pos).prev();
             this.update(false);
         });
 
         el.querySelector('.msg_mod-next-btn').addEventListener('click', () => {
+            log(4, 'Chatbox: Next button clicked for pos', el.dataset.pos);
             this.chatlog.getNthAlternatives(el.dataset.pos).next();
             this.update(false);
         });
@@ -187,6 +199,7 @@ class Chatbox {
 
     // Formats message content with Markdown, syntax highlighting, and LaTeX rendering.
     #formatContent(text, message) {
+        log(5, 'Chatbox: #formatContent called');
         if (!text) return null;
         try {
             text = text.trim();
@@ -202,6 +215,7 @@ class Chatbox {
 
             return wrapper;
         } catch (error) {
+            log(1, 'Chatbox: Formatting error', error);
             triggerError('Formatting error:', error);
             const wrapper = document.createElement('div');
             wrapper.classList.add('content');

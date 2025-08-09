@@ -11,7 +11,9 @@ export const hooks = {
     onPostFormatContent: [], // Called after content is formatted into a wrapper element. Args: (wrapperEl, messageObj).
     onRenderMessage: [], // Called when rendering a message element, allows modifying the DOM element. Args: (el, message).
     onSettingsRender: [], // Called when the settings panel is opened, allows adding elements to it. Args: (settingsEl).
-    onModifySystemPrompt: [] // Called to modify the system prompt before API call. Args: (systemContent) => modifiedSystemContent.
+    onModifySystemPrompt: [], // Called to modify the system prompt before API call. Args: (systemContent) => modifiedSystemContent.
+    onStateChange: [], // Called on central state changes (e.g., receiving, apiKey). Args: (key, value).
+    onChatUpdated: [] // Called when chatlog updates. Args: (chatlog).
 };
 
 window.hooks = hooks; // TODO: only for testing: remove

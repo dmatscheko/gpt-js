@@ -1,11 +1,13 @@
 'use strict';
 
+import { log } from '../utils.js';
 let timeoutId = null;
 
 export const errorBubblePlugin = {
     name: 'error-bubble',
     hooks: {
         onError: function (...args) {
+            log(5, 'errorBubblePlugin: onError called with args', args);
             if (args.length === 0) {
                 args = ['Unknown error'];
             }
@@ -56,6 +58,7 @@ export const errorBubblePlugin = {
 };
 
 function hideBubble() {
+    log(5, 'errorBubblePlugin: Hiding error bubble');
     const bubble = document.getElementById('error-bubble');
     if (!bubble) return;
     bubble.classList.add('hiding');

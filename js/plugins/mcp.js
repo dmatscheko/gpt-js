@@ -1,6 +1,32 @@
 'use strict';
 
-const toolsDescription = `
+import { log } from '../utils.js';
+
+// This plugin enables AI models to use external tools via function calls,
+// handles tool execution via a remote MCP (Model Context Protocol) server, and renders citations in the chat UI.
+
+import { autoMcpEndpoint } from '../config.js';
+if (autoMcpEndpoint !== '' && (localStorage.getItem('gptChat_mcpServer') == null || localStorage.getItem('gptChat_mcpServer') == '')) {
+    localStorage.setItem('gptChat_mcpServer', autoMcpEndpoint);
+}
+
+let cachedToolsSection = '';
+
+// Pre-fetch tools section asynchronously as soon as the module is loaded if MCP URL is set.
+// This ensures it's likely available by the time beforeApiCall is invoked for the first time.
+const mcpUrl = localStorage.getItem('gptChat_mcpServer');
+if (mcpUrl && !cachedToolsSection) {
+    log(4, 'mcpPlugin: Pre-fetching tools section from MCP', mcpUrl);
+    mcpJsonRpc('get_tools_section').then(response => {
+        cachedToolsSection = response;
+        log(3, 'mcpPlugin: Tools section cached successfully');
+    }).catch(error => {
+        log(1, 'mcpPlugin: Failed to pre-fetch tools section', error);
+        cachedToolsSection = ''; // Fallback to empty if fetch fails
+    });
+}
+
+const toolsHeader = `
 
 ## Tools:
 
@@ -20,80 +46,14 @@ You can use multiple tools in parallel by calling them together.
 
 ### Available Tools:
 
-1.  **Code Execution**
-   - **Description:**: This is a stateful code interpreter you have access to. You can use the code interpreter tool to check the code execution output of the code.
-Here the stateful means that it's a REPL (Read Eval Print Loop) like environment, so previous code execution result is preserved.
-Here are some tips on how to use the code interpreter:
-- Make sure you format the code correctly with the right indentation and formatting.
-- You have access to some default environments with some basic and STEM libraries:
-  - Environment: Python 3.12.3
-  - Basic libraries: tqdm, ecdsa
-  - Data processing: numpy, scipy, pandas, matplotlib
-  - Math: sympy, mpmath, statsmodels, PuLP
-  - Physics: astropy, qutip, control
-  - Biology: biopython, pubchempy, dendropy
-  - Chemistry: rdkit, pyscf
-  - Game Development: pygame, chess
-  - Multimedia: mido, midiutil
-  - Machine Learning: networkx, torch
-  - others: snappy
-Keep in mind you have no internet access. Therefore, you CANNOT install any additional packages via pip install, curl, wget, etc.
-You must import any packages you need in the code.
-Do not run code that terminates or exits the repl session.
-   - **Action**: \`code_execution\`
-   - **Arguments**: 
-     - \`code\`: Code : The code to be executed. (type: string) (required)
-
-2.  **Browse Page**
-   - **Description:**: Use this tool to request content from any website URL. It will fetch the page and process it via the LLM summarizer, which extracts/summarizes based on the provided instructions.
-   - **Action**: \`browse_page\`
-   - **Arguments**: 
-     - \`url\`: Url : The URL of the webpage to browse. (type: string) (required)
-     - \`instructions\`: Instructions : The instructions are a custom prompt guiding the summarizer on what to look for. Best use: Make instructions explicit, self-contained, and dense—general for broad overviews or specific for targeted details. This helps chain crawls: If the summary lists next URLs, you can browse those next. Always keep requests focused to avoid vague outputs. (type: string) (required)
-
-3.  **Web Search**
-   - **Description:**: This action allows you to search the web. You can use search operators like site:reddit.com when needed.
-   - **Action**: \`web_search\`
-   - **Arguments**: 
-     - \`query\`: Query : The search query to look up on the web. (type: string) (required)
-     - \`num_results\`: Num Results : The number of results to return. It is optional, default 10, max is 30. (type: integer)(optional) (default: 10)
-
-4.  **Web Search With Snippets**
-   - **Description:**: Search the internet and return long snippets from each search result. Useful for quickly confirming a fact without reading the entire page.
-   - **Action**: \`web_search_with_snippets\`
-   - **Arguments**: 
-     - \`query\`: Query : Search query; you may use operators like site:, filetype:, "exact" for precision. (type: string) (required)
-
-9.  **View Image**
-   - **Description:**: Look at an image at a given url.
-   - **Action**: \`view_image\`
-   - **Arguments**: 
-     - \`image_url\`: Image Url : The url of the image to view. (type: string) (required)
-
-
-
-## Render Components:
-
-You use render components to display content to the user in the final response. Make sure to use the following format for render components, including the  tags. Render component should follow the following XML-inspired format:
-Do not escape any of the arguments. The arguments will be parsed as normal text.
-
-### Available Render Components:
-
-1.  **Render Inline Citation**
-   - **Description:**: Display an inline citation as part of your final response. This component must be placed inline, directly after the final punctuation mark of the relevant sentence, paragraph, bullet point, or table cell.
-Do not cite sources any other way; always use this component to render citation. You should only render citation from web search, browse page, or X search results, not other sources.
-This component only takes one argument, which is "citation_id" and the value should be the citation_id extracted from the previous web search or browse page tool call result which has the format of '[web:citation_id]' or '[post:citation_id]'.
-   - **Type**: \`render_inline_citation\`
-   - **Arguments**: 
-     - \`citation_id\`: Citation Id : The id of the citation to render. Extract the citation_id from the previous web search or browse page tool call result which has the format of '[web:citation_id]'. (type: integer) (required)
-
-
-Interweave render components within your final response where appropriate to enrich the visual presentation. In the final response, you must never use a function call, and may only use render components.`;
+`;
 
 export const mcpPlugin = {
     name: 'mcp',
     hooks: {
+        // Renders a settings input for the MCP server URL if not already present.
         onSettingsRender: function (settingsEl) {
+            log(5, 'mcpPlugin: onSettingsRender called');
             if (settingsEl.querySelector('#mcpServer')) return;
 
             const p = document.createElement('p');
@@ -111,81 +71,165 @@ export const mcpPlugin = {
             p.appendChild(input);
             settingsEl.appendChild(p);
         },
+        // Appends tool descriptions to the system prompt before API calls if MCP is configured and tools are not already included.
         beforeApiCall: function (payload) {
+            log(5, 'mcpPlugin: beforeApiCall called');
             const mcpUrl = localStorage.getItem('gptChat_mcpServer');
-            if (mcpUrl && payload.messages[0].role === 'system' && !payload.messages[0].content.includes('## Tools:')) { // TODO: improve that later
-                payload.messages[0].content += toolsDescription;
+            if (mcpUrl && payload.messages[0].role === 'system' && !payload.messages[0].content.includes('## Tools:')) {
+                if (!cachedToolsSection) return;
+                log(3, 'mcpPlugin: Appending tools section to system prompt');
+                payload.messages[0].content += toolsHeader + cachedToolsSection;
             }
             return payload;
         },
-        onMessageComplete: async function (message, chatbox) {
-            if (message.value.role !== 'assistant') return;
+        // Processes completed assistant messages: parses tool calls, executes them via MCP, marks calls as handled in content,
+        // inserts result/error tags inline after each call, adds tool messages to chatlog, and auto-continues the response.
+        onMessageComplete: function (message, chatbox) {
+            log(5, 'mcpPlugin: onMessageComplete called for role', message.value?.role);
+            if (!message.value || message.value.role !== 'assistant') return;
 
-            const { toolCalls, cleanedContent } = parseFunctionCalls(message.value.content);
-            message.value.content = cleanedContent;
+            const { toolCalls, positions } = parseFunctionCalls(message.value.content);
             if (toolCalls.length > 0) {
-                const toolResults = await Promise.all(toolCalls.map(async (tc) => {
-                    const result = await mcpJsonRpc('call_tool', { name: tc.name, arguments: tc.params });
-                    if (tc.name === 'web_search' || tc.name === 'browse_page' || tc.name.startsWith('x_')) {
-                        message.metadata = { ...message.metadata || {}, sources: result.sources || [] };
+                log(3, 'mcpPlugin: Found tool calls', toolCalls.length);
+                Promise.all(toolCalls.map(async (tc, index) => {
+                    log(4, 'mcpPlugin: Executing tool', tc.name, 'with params', tc.params);
+                    try {
+                        const result = await mcpJsonRpc('call_tool', { name: tc.name, arguments: tc.params });
+                        if (tc.name === 'web_search' || tc.name === 'browse_page' || tc.name.startsWith('x_')) {
+                            message.metadata = { ...message.metadata || {}, sources: result.sources || [] };
+                            log(4, 'mcpPlugin: Added sources to metadata', result.sources?.length || 0);
+                        }
+                        return { role: 'tool', content: JSON.stringify(result), error: null };
+                    } catch (error) {
+                        log(1, 'mcpPlugin: Tool execution error', error);
+                        return { role: 'tool', content: null, error: error.message || 'Unknown error' };
                     }
-                    return { role: 'tool', content: JSON.stringify(result) };
-                }));
+                })).then(toolResults => {
+                    log(4, 'mcpPlugin: Processing tool results', toolResults.length);
+                    // Modify content: add handled="true" to start tags and insert <dma:result> or <dma:error> after end tags.
+                    // Process in reverse order to avoid index shifts during insertions.
+                    let content = message.value.content;
+                    for (let i = toolResults.length - 1; i >= 0; i--) {
+                        const pos = positions[i];
+                        const tr = toolResults[i];
+                        // Add handled attribute to start tag
+                        const startTag = '<dma:function_call>';
+                        const newStartTag = '<dma:function_call handled="true">';
+                        content = content.slice(0, pos.start) + content.slice(pos.start).replace(startTag, newStartTag, 1);
+                        // Insert result/error tag after end tag (adjust endIndex after start modification)
+                        const endIndex = content.indexOf('</dma:function_call>', pos.start) + 20; // 20 = tag length
+                        const insertTag = tr.error
+                            ? `\n<dma:error>${tr.error}</dma:error>`
+                            : `\n<dma:result>${tr.content}</dma:result>`;
+                        content = content.slice(0, endIndex) + insertTag + content.slice(endIndex);
+                    }
+                    message.value.content = content;
 
-                toolResults.forEach(tr => message.chatlog.addMessage(tr));
-                chatbox.update();
-                // Auto-continue by streaming new assistant response
-                const chatlog = chatbox.chatlog;
-                chatlog.addMessage(null);
-                chatbox.update();
-                await generateAIResponse(chatbox);
+                    // Add tool results as message
+                    let toolContents = ''
+                    toolResults.forEach(tr => {
+                        const toolContent = tr.error ? JSON.stringify({ error: tr.error }) : JSON.stringify(tr); // Handle errors explicitly
+                        toolContents += toolContent + "\n";
+                    });
+                    if (toolContents !== '') {
+                        chatbox.chatlog.addMessage({ role: 'tool', content: toolContents });
+                    }
+
+                    // Auto-continue by streaming new assistant response
+                    const controller = chatbox.store.get('controllerInstance');
+                    const chatlog = chatbox.chatlog;
+                    chatlog.addMessage(null);
+                    chatbox.update();
+                    controller.generateAIResponse();
+                });
             }
         },
+        // Formats rendered content: replaces citation XML tags with HTML superscript links using message metadata sources.
         onPostFormatContent: function (wrapper, message) {
+            log(5, 'mcpPlugin: onPostFormatContent called');
             wrapper.querySelectorAll('dma\\:render[type="render_inline_citation"]').forEach(node => {
                 const argNode = node.querySelector('argument[name="citation_id"]');
                 const id = argNode ? parseInt(argNode.textContent.trim()) : null;
-                if (id) {
-                    const source = message.metadata?.sources?.[id - 1];
-                    if (source) {
-                        const sup = document.createElement('sup');
-                        const a = document.createElement('a');
-                        a.href = source.url;
-                        a.title = source.title || 'Source';
-                        a.textContent = `[${id}]`;
-                        sup.appendChild(a);
-                        node.parentNode.replaceChild(sup, node);
-                    } else {
-                        // Fallback if no source: remove or placeholder
-                        node.parentNode.removeChild(node);
-                    }
-                } else {
+                if (!id) {
+                    log(2, 'mcpPlugin: Invalid citation_id, removing node');
                     node.parentNode.removeChild(node);
+                    return;
                 }
+                const source = message.metadata?.sources?.[id - 1];
+                const sup = document.createElement('sup');
+                const a = document.createElement('a');
+                if (source) {
+                    a.href = source.url;
+                    a.title = source.title || 'Source';
+                } else {
+                    log(2, 'mcpPlugin: Citation not found for id', id);
+                    a.title = 'Citation not found';
+                    a.style.color = 'red'; // Visual indicator
+                }
+                a.textContent = `[${id}]`;
+                sup.appendChild(a);
+                node.parentNode.replaceChild(sup, node);
             });
         }
     }
 };
 
-// Parser for <dma:function_call>
+// Robust parser for <dma:function_call> tags that extracts tool calls without full-content XML parsing,
+// handles unescaping of special tags, and returns positions for later content modifications.
 function parseFunctionCalls(content) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(`<root>${content}</root>`, 'application/xml');
+    log(5, 'mcpPlugin: parseFunctionCalls called');
     const toolCalls = [];
-    doc.querySelectorAll('dma\\:function_call').forEach(node => {
-        const name = node.getAttribute('name');
-        const params = {};
-        node.querySelectorAll('parameter').forEach(param => {
-            params[param.getAttribute('name')] = param.textContent.trim();
-        });
-        toolCalls.push({ name, params });
-        node.parentNode.removeChild(node);
-    });
-    return { toolCalls, cleanedContent: doc.documentElement.innerHTML };
+    const positions = []; // Track start/end indices for each call
+    // Regex to match <dma:function_call ...> allowing attributes and whitespace
+
+    const startRegex = /<dma:function_call\s*(?:[^>]*?)>/gi;
+    let match;
+    let lastIndex = 0;
+    while ((match = startRegex.exec(content)) !== null) {
+        const startIndex = match.index;
+        const endIndex = content.indexOf('</dma:function_call>', startIndex);
+        if (endIndex === -1) break;
+
+        const snippet = content.substring(startIndex, endIndex + 20); // 20 = length of </dma:function_call>
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<root>${snippet}</root>`, 'application/xml'); // Wrap snippet only
+
+        if (doc.documentElement.localName === 'parsererror') {
+            log(2, 'mcpPlugin: Invalid XML snippet in parseFunctionCalls');
+            // Skip invalid snippet, move past to avoid infinite loop
+            lastIndex = startIndex + snippet.length;
+            continue;
+        }
+
+        const functionCallNode = doc.querySelector('dma\\:function_call');
+        if (functionCallNode) {
+            if (functionCallNode.getAttribute('handled') === 'true') {
+                log(4, 'mcpPlugin: Skipping already handled tool call');
+                lastIndex = endIndex + 20;
+                continue;
+            }
+            const name = functionCallNode.getAttribute('name');
+            const params = {};
+            functionCallNode.querySelectorAll('parameter').forEach(param => {
+                let value = param.textContent.trim();
+                // Unescape special cases as per instructions
+                value = value.replace(/<\\\/dma:function_call>/g, '</dma:function_call>').replace(/<\\\/parameter>/g, '</parameter');
+                params[param.getAttribute('name')] = value;
+            });
+            toolCalls.push({ name, params });
+            positions.push({ start: startIndex, end: endIndex + 20 });
+        }
+        lastIndex = endIndex + 20;
+    }
+
+    log(4, 'mcpPlugin: Parsed tool calls', toolCalls.length);
+    return { toolCalls, positions };
 }
 
-// MCP JSON-RPC
+// Performs JSON-RPC calls to the MCP server for tool execution,
+// throwing detailed errors on failure.
 async function mcpJsonRpc(method, params = {}) {
+    log(5, 'mcpPlugin: mcpJsonRpc called with method', method, 'params', params);
     const url = localStorage.getItem('gptChat_mcpServer');
     if (!url) throw new Error('No MCP server URL set');
 
@@ -203,13 +247,20 @@ async function mcpJsonRpc(method, params = {}) {
             body: JSON.stringify(body)
         });
 
-        if (!resp.ok) throw new Error(`MCP error: ${resp.statusText}`);
-
+        if (!resp.ok) {
+            const errorText = await resp.text(); // Fetch body for more details
+            log(1, 'mcpPlugin: MCP response not ok', resp.status, resp.statusText, errorText);
+            throw new Error(`MCP error: ${resp.statusText} - ${errorText}`);
+        }
         const data = await resp.json();
-        if (data.error) throw new Error(data.error.message || 'MCP call failed');
-
+        if (data.error) {
+            log(1, 'mcpPlugin: MCP JSON-RPC error', data.error);
+            throw new Error(data.error.message || 'MCP call failed');
+        }
+        log(4, 'mcpPlugin: MCP JSON-RPC success', data.result);
         return data.result;
     } catch (error) {
+        log(1, 'mcpPlugin: MCP JSON-RPC failure', error);
         throw new AggregateError(
             [error],
             `Failed to perform MCP JSON-RPC call.\nURL: ${url}, Method: ${method}, Params: ${JSON.stringify(params)}.\nOriginal error: ${error.message || 'Unknown'}.`

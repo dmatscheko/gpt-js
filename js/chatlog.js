@@ -1,8 +1,12 @@
 'use strict';
 
+import { log } from './utils.js';
+import { hooks } from './hooks.js';
+
 // Represents a single message in the chatlog.
 class Message {
     constructor(value) {
+        log(5, 'Message: Constructor called with value', value);
         this.value = value;
         this.metadata = null;
         this.cache = null;
@@ -11,11 +15,13 @@ class Message {
 
     // Retrieves the active answer message if alternatives exist.
     getAnswerMessage() {
+        log(5, 'Message: getAnswerMessage called');
         return this.answerAlternatives ? this.answerAlternatives.getActiveMessage() : null;
     }
 
     // Serializes the message to JSON.
     toJSON() {
+        log(5, 'Message: toJSON called');
         return {
             value: this.value,
             metadata: this.metadata,
@@ -27,12 +33,14 @@ class Message {
 // Manages alternative messages at a given point in the chatlog.
 class Alternatives {
     constructor() {
+        log(5, 'Alternatives: Constructor called');
         this.messages = [];
         this.activeMessageIndex = -1;
     }
 
     // Adds a new message or updates the active one if it's null.
     addMessage(value) {
+        log(5, 'Alternatives: addMessage called with value', value);
         const current = this.getActiveMessage();
         if (current && current.value === null) {
             current.value = value;
@@ -46,17 +54,20 @@ class Alternatives {
 
     // Sets the active message by value.
     setActiveMessage(value) {
+        log(5, 'Alternatives: setActiveMessage called');
         const index = this.messages.findIndex(msg => msg.value === value);
         if (index !== -1) this.activeMessageIndex = index;
     }
 
     // Gets the currently active message.
     getActiveMessage() {
+        log(5, 'Alternatives: getActiveMessage called');
         return this.activeMessageIndex !== -1 ? this.messages[this.activeMessageIndex] || null : null;
     }
 
     // Cycles to the next alternative message.
     next() {
+        log(5, 'Alternatives: next called');
         if (this.activeMessageIndex === -1) return null;
         if (!this.messages[this.activeMessageIndex] || this.messages[this.activeMessageIndex].value === null) {
             this.messages.splice(this.activeMessageIndex, 1);
@@ -68,6 +79,7 @@ class Alternatives {
 
     // Cycles to the previous alternative message.
     prev() {
+        log(5, 'Alternatives: prev called');
         if (this.activeMessageIndex === -1) return null;
         if (!this.messages[this.activeMessageIndex] || this.messages[this.activeMessageIndex].value === null) {
             this.messages.splice(this.activeMessageIndex, 1);
@@ -79,10 +91,12 @@ class Alternatives {
 
     // Clears the cache for all messages in this set of alternatives.
     clearCache() {
+        log(5, 'Alternatives: clearCache called');
         this.messages.forEach(msg => { if (msg) msg.cache = null; });
     }
 
     toJSON() {
+        log(5, 'Alternatives: toJSON called');
         return {
             messages: this.messages.map(msg => msg ? msg.toJSON() : null),
             activeMessageIndex: this.activeMessageIndex
@@ -93,43 +107,66 @@ class Alternatives {
 // Manages the entire chat history as a tree of alternatives.
 class Chatlog {
     constructor() {
+        log(5, 'Chatlog: Constructor called');
         this.rootAlternatives = null;
+        this.subscribers = [];
+    }
+
+    subscribe(cb) {
+        log(5, 'Chatlog: subscribe called');
+        this.subscribers.push(cb);
+    }
+
+    notify() {
+        log(5, 'Chatlog: notify called');
+        this.subscribers.forEach(cb => cb());
+        hooks.onChatUpdated.forEach(fn => fn(this));
     }
 
     // Adds a message to the chatlog, creating alternatives if needed.
     addMessage(value) {
+        log(4, 'Chatlog: addMessage called with role', value?.role);
         const lastMessage = this.getLastMessage();
         if (!lastMessage) {
             this.rootAlternatives = new Alternatives();
-            return this.rootAlternatives.addMessage(value);
+            const msg = this.rootAlternatives.addMessage(value);
+            this.notify();
+            return msg;
         }
         if (lastMessage.value === null) {
             lastMessage.value = value;
+            this.notify();
             return lastMessage;
         }
         lastMessage.answerAlternatives = new Alternatives();
-        return lastMessage.answerAlternatives.addMessage(value);
+        const msg = lastMessage.answerAlternatives.addMessage(value);
+        this.notify();
+        return msg;
     }
 
     // Gets the first message in the active path.
     getFirstMessage() {
+        log(5, 'Chatlog: getFirstMessage called');
         return this.rootAlternatives ? this.rootAlternatives.getActiveMessage() : null;
     }
 
     // Gets the last message in the active path.
     getLastMessage() {
+        log(5, 'Chatlog: getLastMessage called');
         const lastAlternatives = this.getLastAlternatives();
         return lastAlternatives ? lastAlternatives.getActiveMessage() : null;
     }
 
     // Gets the nth message in the active path.
     getNthMessage(n) {
+        log(5, 'Chatlog: getNthMessage called for n', n);
         const alternatives = this.getNthAlternatives(parseInt(n));
         return alternatives ? alternatives.getActiveMessage() : null;
     }
 
     // Gets the alternatives at the nth position in the active path.
     getNthAlternatives(n) {
+        log(5, 'Chatlog: getNthAlternatives called for n', n);
         let pos = 0;
         let current = this.rootAlternatives;
         while (current) {
@@ -144,6 +181,7 @@ class Chatlog {
 
     // Gets the last set of alternatives in the active path.
     getLastAlternatives() {
+        log(5, 'Chatlog: getLastAlternatives called');
         let current = this.rootAlternatives;
         let last = current;
         while (current) {
@@ -157,6 +195,7 @@ class Chatlog {
 
     // Returns an array of active message values along the path.
     getActiveMessageValues() {
+        log(5, 'Chatlog: getActiveMessageValues called');
         const result = [];
         let message = this.getFirstMessage();
         while (message && message.value) {
@@ -168,6 +207,7 @@ class Chatlog {
 
     // Loads the chatlog from serialized alternatives data.
     load(alternativesData) {
+        log(5, 'Chatlog: load called');
         let msgCount = 0;
         const buildAlternatives = (data) => {
             if (!data) return null;
@@ -185,29 +225,54 @@ class Chatlog {
         };
         this.rootAlternatives = buildAlternatives(alternativesData);
         this.clean();
+        log(3, 'Chatlog: Loaded with message count', msgCount);
+        this.notify();
     }
 
-    // Removes messages with null values (incomplete messages).
+    // Removes messages with null values (incomplete messages) iteratively to avoid stack overflow.
     clean() {
+        log(4, 'Chatlog: clean called');
         if (!this.rootAlternatives) return;
-        const cleanAlt = (alt) => {
+        const stack = [this.rootAlternatives];
+        while (stack.length > 0) {
+            const alt = stack.pop();
             alt.messages = alt.messages.filter(msg => msg.value !== null);
             if (alt.activeMessageIndex >= alt.messages.length) {
                 alt.activeMessageIndex = alt.messages.length - 1;
             }
+            if (alt.activeMessageIndex === -1 && alt.messages.length > 0) {
+                alt.activeMessageIndex = 0;
+            }
             alt.messages.forEach(msg => {
-                if (msg.answerAlternatives) cleanAlt(msg.answerAlternatives);
+                if (msg.answerAlternatives) stack.push(msg.answerAlternatives);
             });
-        };
-        cleanAlt(this.rootAlternatives);
+        }
+        this.notify();
     }
 
     // Clears all caches in the chatlog by reloading the structure.
     clearCache() {
+        log(4, 'Chatlog: clearCache called');
         this.load(this.rootAlternatives);
     }
 
+    /*
+    // Flattens the active path to a linear array of messages.
+    flatten() {
+        const result = [];
+        let alternative = this.rootAlternatives;
+        while (alternative) {
+            const message = alternative.getActiveMessage();
+            if (!message) break;
+            result.push(message.value);
+            alternative = message.answerAlternatives;
+        }
+        return result;
+    }
+    */
+
     toJSON() {
+        log(5, 'Chatlog: toJSON called');
         return this.rootAlternatives ? this.rootAlternatives.toJSON() : null;
     }
 }

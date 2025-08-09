@@ -1,3 +1,8 @@
-/js/api_key.js
-/_test
+/_test/
+
+/.venv/
+/uv.lock
+
 .DS_Store
+
+__pycache__/

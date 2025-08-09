@@ -1,0 +1,22 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Body -->
+  <circle cx="100" cy="100" r="40" fill="#000000" />
+  
+  <!-- Belly -->
+  <circle cx="100" cy="100" r="35" fill="#FFFFFF" />
+  
+  <!-- Eyes -->
+  <circle cx="85" cy="90" r="6" fill="#000000" />
+  <circle cx="115" cy="90" r="6" fill="#000000" />
+  
+  <!-- Beak -->
+  <polygon points="100,110 110,105 110,115" fill="#FFA500" />
+  
+  <!-- Flippers -->
+  <circle cx="75" cy="115" r="10" fill="#000000" />
+  <circle cx="125" cy="115" r="10" fill="#000000" />
+  
+  <!-- Feet -->
+  <circle cx="90" cy="145" r="8" fill="#FFA500" />
+  <circle cx="110" cy="145" r="8" fill="#FFA500" />
+</svg>

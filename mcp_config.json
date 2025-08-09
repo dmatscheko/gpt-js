@@ -1,0 +1,13 @@
+{
+  "backends": [
+    {
+      "name": "datetime",
+      "command": "uvx",
+      "args": [
+        "fastmcp",
+        "run",
+        "./_mcp_servers/date_time.py"
+      ]
+    }
+  ]
+}

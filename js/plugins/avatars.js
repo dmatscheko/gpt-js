@@ -1,5 +1,8 @@
 'use strict';
 
+import { triggerError } from '../utils.js';
+import { log } from '../utils.js';
+
 // Default SVG avatars for user (ping) and assistant (pong).
 const avatarPing = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
 <circle cx="40" cy="40" r="40" fill="#FFC107" />
@@ -19,6 +22,7 @@ export const avatarsPlugin = {
     name: 'avatars',
     hooks: {
         onRenderMessage: function (el, message, chatbox) {
+            log(4, 'avatarsPlugin: Rendering avatar for role', message.value.role);
             let type = 'ping';
             if (message.value.role === 'assistant') type = 'pong';
 
@@ -30,8 +34,10 @@ export const avatarsPlugin = {
             avatar.src = avatarSrc || `data:image/svg+xml,${encodeURIComponent(type === 'ping' ? avatarPing : avatarPong)}`;
 
             avatar.addEventListener('click', () => {
+                log(5, 'avatarsPlugin: Avatar clicked for type', type);
                 if (!localStorage) return;
                 if (isCustom) {
+                    log(4, 'avatarsPlugin: Resetting to default avatar for type', type);
                     avatar.src = `data:image/svg+xml,${encodeURIComponent(type === 'ping' ? avatarPing : avatarPong)}`;
                     localStorage.removeItem(`gptChat_${type}Avatar`);
                     chatbox.chatlog.clearCache();
@@ -42,13 +48,31 @@ export const avatarsPlugin = {
                 input.type = 'file';
                 input.accept = 'image/*';
                 input.addEventListener('change', () => {
+                    log(5, 'avatarsPlugin: File input changed');
                     const file = input.files[0];
+                    if (!file) return;
+                    log(3, 'avatarsPlugin: Selected file', file.name, 'size:', file.size);
+                    if (!file.type.startsWith('image/')) {
+                        log(2, 'avatarsPlugin: Invalid file type', file.type);
+                        triggerError('Invalid file type. Please upload an image.');
+                        return;
+                    }
+                    if (file.size > 1024 * 1024 * 2) { // 2MB limit
+                        log(2, 'avatarsPlugin: File too large', file.size);
+                        triggerError('File too large. Maximum size is 2MB.');
+                        return;
+                    }
                     const reader = new FileReader();
                     reader.addEventListener('load', () => {
+                        log(4, 'avatarsPlugin: File loaded successfully');
                         localStorage.setItem(`gptChat_${type}Avatar`, reader.result);
                         avatar.src = reader.result;
                         chatbox.chatlog.clearCache();
                         chatbox.update(false);
+                    });
+                    reader.addEventListener('error', () => {
+                        log(1, 'avatarsPlugin: Failed to read file');
+                        triggerError('Failed to read avatar file.');
                     });
                     reader.readAsDataURL(file);
                 });

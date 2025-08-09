@@ -16,6 +16,12 @@ You can test it at: [https://huggingface.co/spaces/dma123/gpt-js](https://huggin
 
 You can also run it locally: `python -m http.server 8000`
 
+Or with MCP:
+```bash
+uv sync
+uv run main.py
+```
+
 1. Create an OpenAI account at [https://platform.openai.com/account](https://platform.openai.com/account).
 2. Create an API key at [https://platform.openai.com/account/api-keys](https://platform.openai.com/account/api-keys).
 3. Enter the API key at the login dialog. This can be called by clicking login at the settings panel (gear button).

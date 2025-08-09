@@ -25,3 +25,7 @@ export const messageSubmit = '<svg width="24" height="24" viewBox="0 0 24 24" fi
 export const messageStop = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7zm12 0H7v10h10V7z" fill="currentColor"/></svg>';
 
 export const defaultEndpoint = 'https://api.openai.com/v1/chat/completions';
+
+export const autoMcpEndpoint = '';
+
+export const DEBUG_LEVEL = 5; // Debug level: 0: none, 1: errors, 2: warnings, 3: info, 4: debug, 5: trace
