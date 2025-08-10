@@ -41,7 +41,6 @@ example_arg_value2
 </dma:function_call>
 Do not escape any of the function call arguments. The arguments will be parsed as normal text. There is one exception: If you need to write </dma:function_call> or </parameter> as value inside a <parameter>, write it like <\/dma:function_call> or <\/parameter>.
 
-
 You can use multiple tools in parallel by calling them together.
 
 ### Available Tools:
@@ -75,18 +74,14 @@ export const mcpPlugin = {
         beforeApiCall: function (payload, chatbox) {
             log(5, 'mcpPlugin: beforeApiCall called');
             const mcpUrl = localStorage.getItem('gptChat_mcpServer');
-            if (mcpUrl && payload.messages[0].role === 'system' && !payload.messages[0].content.includes('## Tools:')) {
-                if (!cachedToolsSection) return;
-                log(3, 'mcpPlugin: Appending tools section to system prompt');
-                payload.messages[0].content += toolsHeader + cachedToolsSection;
-
-                // Persist to chatlog and invalidate cache
-                const systemMessage = chatbox.chatlog.getFirstMessage();
-                if (systemMessage && !systemMessage.value.content.includes('## Tools:')) {
-                    systemMessage.value.content += toolsHeader + cachedToolsSection;
-                    systemMessage.cache = null;
-                    chatbox.update(false);  // Update UI immediately (no scroll)
-                }
+            if (!mcpUrl || !cachedToolsSection) return;
+            log(3, 'mcpPlugin: Appending tools section to system prompt');
+            // Persist to chatlog and invalidate cache
+            const systemMessage = chatbox.chatlog.getFirstMessage();
+            if (systemMessage && !systemMessage.value.content.includes('## Tools:')) {
+                systemMessage.value.content += toolsHeader + cachedToolsSection;
+                systemMessage.cache = null;
+                chatbox.update(true);  // Update UI immediately and scroll
             }
             return payload;
         },
