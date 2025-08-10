@@ -72,13 +72,21 @@ export const mcpPlugin = {
             settingsEl.appendChild(p);
         },
         // Appends tool descriptions to the system prompt before API calls if MCP is configured and tools are not already included.
-        beforeApiCall: function (payload) {
+        beforeApiCall: function (payload, chatbox) {
             log(5, 'mcpPlugin: beforeApiCall called');
             const mcpUrl = localStorage.getItem('gptChat_mcpServer');
             if (mcpUrl && payload.messages[0].role === 'system' && !payload.messages[0].content.includes('## Tools:')) {
                 if (!cachedToolsSection) return;
                 log(3, 'mcpPlugin: Appending tools section to system prompt');
                 payload.messages[0].content += toolsHeader + cachedToolsSection;
+
+                // Persist to chatlog and invalidate cache
+                const systemMessage = chatbox.chatlog.getFirstMessage();
+                if (systemMessage && !systemMessage.value.content.includes('## Tools:')) {
+                    systemMessage.value.content += toolsHeader + cachedToolsSection;
+                    systemMessage.cache = null;
+                    chatbox.update(false);  // Update UI immediately (no scroll)
+                }
             }
             return payload;
         },
@@ -91,6 +99,24 @@ export const mcpPlugin = {
             const { toolCalls, positions } = parseFunctionCalls(message.value.content);
             if (toolCalls.length > 0) {
                 log(3, 'mcpPlugin: Found tool calls', toolCalls.length);
+
+                // Assign unique IDs to each tool call
+                toolCalls.forEach((tc, index) => {
+                    tc.id = `tool_${index + 1}_${Math.random().toString(36).substring(2, 7)}`;
+                });
+
+                // Modify content to add tool_call_id attributes (in reverse to avoid index shifts)
+                let content = message.value.content;
+                for (let i = positions.length - 1; i >= 0; i--) {
+                    const pos = positions[i];
+                    const gtIndex = content.indexOf('>', pos.start);
+                    const insert = ` tool_call_id="${toolCalls[i].id}"`;
+                    content = content.slice(0, gtIndex) + insert + content.slice(gtIndex);
+                }
+                message.value.content = content;
+                message.cache = null;  // Invalidate cache after modification
+                chatbox.update(false);  // Update UI (no scroll)
+
                 Promise.all(toolCalls.map(async (tc, index) => {
                     log(4, 'mcpPlugin: Executing tool', tc.name, 'with params', tc.params);
                     try {
@@ -99,47 +125,46 @@ export const mcpPlugin = {
                             message.metadata = { ...message.metadata || {}, sources: result.sources || [] };
                             log(4, 'mcpPlugin: Added sources to metadata', result.sources?.length || 0);
                         }
-                        return { role: 'tool', content: JSON.stringify(result), error: null };
+                        // Conditionally stringify based on result type to avoid extra quotes on strings.
+                        // Use String() for non-objects to handle numbers/booleans safely.
+                        const content = (typeof result === 'object' && result !== null) ? JSON.stringify(result) : String(result);
+                        return { content, error: null };
                     } catch (error) {
                         log(1, 'mcpPlugin: Tool execution error', error);
-                        return { role: 'tool', content: null, error: error.message || 'Unknown error' };
+                        return { content: null, error: error.message || 'Unknown error' };
                     }
                 })).then(toolResults => {
                     log(4, 'mcpPlugin: Processing tool results', toolResults.length);
-                    // Modify content: add handled="true" to start tags and insert <dma:result> or <dma:error> after end tags.
-                    // Process in reverse order to avoid index shifts during insertions.
+                    // Modify content: add handled="true" to start tags (no result/error insertion inline)
                     let content = message.value.content;
-                    for (let i = toolResults.length - 1; i >= 0; i--) {
+                    for (let i = positions.length - 1; i >= 0; i--) {
                         const pos = positions[i];
-                        const tr = toolResults[i];
-                        // Add handled attribute to start tag
-                        const startTag = '<dma:function_call>';
-                        const newStartTag = '<dma:function_call handled="true">';
-                        content = content.slice(0, pos.start) + content.slice(pos.start).replace(startTag, newStartTag, 1);
-                        // Insert result/error tag after end tag (adjust endIndex after start modification)
-                        const endIndex = content.indexOf('</dma:function_call>', pos.start) + 20; // 20 = tag length
-                        const insertTag = tr.error
-                            ? `\n<dma:error>${tr.error}</dma:error>`
-                            : `\n<dma:result>${tr.content}</dma:result>`;
-                        content = content.slice(0, endIndex) + insertTag + content.slice(endIndex);
+                        const gtIndex = content.indexOf('>', pos.start);
+                        const insert = ' handled="true"';
+                        content = content.slice(0, gtIndex) + insert + content.slice(gtIndex);
                     }
                     message.value.content = content;
-
-                    // Add tool results as message
-                    let toolContents = ''
-                    toolResults.forEach(tr => {
-                        const toolContent = tr.error ? JSON.stringify({ error: tr.error }) : JSON.stringify(tr); // Handle errors explicitly
-                        toolContents += toolContent + "\n";
+                    message.cache = null;  // Invalidate again after second modification
+                    // Add tool results as XML-like tags in a single tool message
+                    let toolContents = '';
+                    toolResults.forEach((tr, index) => {
+                        const id = toolCalls[index].id;
+                        let inner = '';
+                        if (tr.error) {
+                            inner = `<error>\n${escapeXml(tr.error)}\n</error>`;
+                        } else {
+                            inner = `<content>\n${escapeXml(tr.content)}\n</content>`;
+                        }
+                        toolContents += `<dma:tool_response tool_call_id="${id}">\n${inner}\n</dma:tool_response>\n`;
                     });
                     if (toolContents !== '') {
                         chatbox.chatlog.addMessage({ role: 'tool', content: toolContents });
                     }
-
                     // Auto-continue by streaming new assistant response
                     const controller = chatbox.store.get('controllerInstance');
                     const chatlog = chatbox.chatlog;
                     chatlog.addMessage(null);
-                    chatbox.update();
+                    chatbox.update();  // Final update (with scroll, as new messages added)
                     controller.generateAIResponse();
                 });
             }
@@ -266,4 +291,17 @@ async function mcpJsonRpc(method, params = {}) {
             `Failed to perform MCP JSON-RPC call.\nURL: ${url}, Method: ${method}, Params: ${JSON.stringify(params)}.\nOriginal error: ${error.message || 'Unknown'}.`
         );
     }
+}
+
+// Escape XML special characters for safe insertion into tags
+function escapeXml(unsafe) {
+    return unsafe.replace(/[<>&'"]/g, function (c) {
+        switch (c) {
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '&': return '&amp;';
+            case '\'': return '&apos;';
+            case '"': return '&quot;';
+        }
+    });
 }

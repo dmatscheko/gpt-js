@@ -615,7 +615,7 @@ class Controller {
                 payload.messages[0].content = systemContent;
             }
             for (let fn of hooks.beforeApiCall) {
-                const modified = fn(payload);
+                const modified = fn(payload, this.ui.chatlogEl);
                 if (modified) payload = modified;
             }
             await this.streamAPIResponse(payload);
