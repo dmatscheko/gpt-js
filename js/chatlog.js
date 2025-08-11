@@ -28,6 +28,25 @@ class Message {
             answerAlternatives: this.answerAlternatives
         };
     }
+
+    // Sets the content of a message.
+    setContent(content) {
+        log(5, 'Message: setContent called');
+        this.value.content = content;
+        this.cache = null;
+    }
+
+    // Appends the delta to the content of a message.
+    appendContent(delta) {
+        log(5, 'Message: appendContent called with delta', delta);
+        if (this.value === null) {
+            this.value = { role: 'assistant', content: delta };
+        } else {
+            if (!this.value.content) this.value.content = '';
+            this.value.content += delta;
+        }
+        this.cache = null;
+    }
 }
 
 // Manages alternative messages at a given point in the chatlog.
@@ -115,6 +134,11 @@ class Chatlog {
     subscribe(cb) {
         log(5, 'Chatlog: subscribe called');
         this.subscribers.push(cb);
+    }
+
+    unsubscribe(cb) {
+        log(5, 'Chatlog: unsubscribe called');
+        this.subscribers = this.subscribers.filter(s => s !== cb);
     }
 
     notify() {

@@ -25,7 +25,8 @@ class Controller {
         this.store.set('controllerInstance', this);
         this.chats = [];
         this.currentChatId = null;
-        this.chatlog = new Chatlog();
+        this.chatlog = null;
+        this.boundUpdate = null;
         this.ui = {
             chatlogEl: null,
             messageEl: document.getElementById('messageInput'),
@@ -65,10 +66,8 @@ class Controller {
             event.preventDefault();
         });
 
-        this.ui.chatlogEl = new Chatbox(this.chatlog, document.getElementById('chat'), this.store);
+        this.ui.chatlogEl = new Chatbox(null, document.getElementById('chat'), this.store);
         this.ui.chatlogEl.onUpdate = () => this.persistChats();
-        this.chatlog.subscribe(() => this.ui.chatlogEl.update());
-
         this.loadChats();
         const initialId = this.currentChatId || this.chats[0]?.id;
         this.currentChatId = null;
@@ -78,7 +77,6 @@ class Controller {
             this.switchChat(initialId);
         }
         this.updateChatList();
-
         const hasStoredKey = localStorage.getItem('gptChat_apiKey') !== null;
         if (hasStoredKey) {
             let success = this.loadModelsFromStorage();
@@ -103,13 +101,14 @@ class Controller {
         window.addEventListener('beforeunload', () => this.persistChats());
         this.setUpEventListeners();
     }
+
     createNewChat() {
         log(3, 'Controller: createNewChat called');
         const id = Date.now().toString();
         const title = 'New Chat';
-        const newChatlog = new Chatlog();
-        newChatlog.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
-        this.chats.push({ id, title, data: newChatlog.toJSON() });
+        const chatlog = new Chatlog();
+        chatlog.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
+        this.chats.push({ id, title, chatlog });
         this.switchChat(id);
         this.updateChatList();
     }
@@ -118,18 +117,15 @@ class Controller {
         log(3, 'Controller: switchChat called for id', id);
         this.persistChats();
         this.currentChatId = id;
-        const newCurrent = this.chats.find(c => c.id === id);
-        this.chatlog = new Chatlog();
-        this.chatlog.load(newCurrent.data || null);
-        // Ensure system prompt is always first (robustness for empty/corrupted data)
-        if (!this.chatlog.getFirstMessage() || this.chatlog.getFirstMessage().value.role !== 'system') {
-            log(2, 'Controller: Adding missing system prompt in switchChat');
-            const oldRoot = this.chatlog.rootAlternatives;
-            this.chatlog.rootAlternatives = new Alternatives();
-            const sysMsg = this.chatlog.rootAlternatives.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
-            sysMsg.answerAlternatives = oldRoot;
+        const oldChatlog = this.chatlog;
+        if (oldChatlog && this.boundUpdate) {
+            oldChatlog.unsubscribe(this.boundUpdate);
         }
+        const newCurrent = this.chats.find(c => c.id === id);
+        this.chatlog = newCurrent.chatlog;
         this.ui.chatlogEl.chatlog = this.chatlog;
+        this.boundUpdate = this.ui.chatlogEl.update.bind(this.ui.chatlogEl);
+        this.chatlog.subscribe(this.boundUpdate);
         this.ui.chatlogEl.update();
         this.updateChatList();
         if (window.innerWidth <= 1037) {
@@ -200,13 +196,12 @@ class Controller {
 
     persistChats() {
         log(5, 'Controller: persistChats called');
-        if (this.currentChatId) {
-            const current = this.chats.find(c => c.id === this.currentChatId);
-            if (current) {
-                current.data = this.chatlog.toJSON();
-            }
-        }
-        localStorage.setItem('gptChat_chats', JSON.stringify(this.chats));
+        const serializedChats = this.chats.map(c => ({
+            id: c.id,
+            title: c.title,
+            data: c.chatlog.toJSON()
+        }));
+        localStorage.setItem('gptChat_chats', JSON.stringify(serializedChats));
         localStorage.setItem('gptChat_currentChatId', this.currentChatId);
     }
 
@@ -216,7 +211,21 @@ class Controller {
         let migrated = false;
         let legacyLoaded = false;
         if (storedChats) {
-            this.chats = JSON.parse(storedChats);
+            const parsed = JSON.parse(storedChats);
+            this.chats = parsed.map(chatData => {
+                const chatlog = new Chatlog();
+                chatlog.load(chatData.data || null);
+                // Ensure system prompt
+                const first = chatlog.getFirstMessage();
+                if (!first || first.value.role !== 'system') {
+                    log(4, 'Controller: Adding missing system prompt in loadChats');
+                    const oldRoot = chatlog.rootAlternatives;
+                    chatlog.rootAlternatives = new Alternatives();
+                    const sysMsg = chatlog.rootAlternatives.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
+                    sysMsg.answerAlternatives = oldRoot;
+                }
+                return { id: chatData.id, title: chatData.title, chatlog };
+            });
         } else {
             const oldChatlog = localStorage.getItem('gptChat_chatlog');
             if (oldChatlog) {
@@ -230,34 +239,18 @@ class Controller {
                     parsed.forEach(msg => tempLog.addMessage(msg));
                     rootData = tempLog.toJSON();
                 }
-                this.chats = [{ id: Date.now().toString(), title: 'Legacy Chat', data: rootData }];
+                const chatlog = new Chatlog();
+                chatlog.load(rootData);
+                this.chats = [{ id: Date.now().toString(), title: 'Legacy Chat', chatlog }];
                 localStorage.removeItem('gptChat_chatlog');
                 legacyLoaded = true;
             } else {
                 this.chats = [];
             }
         }
-        this.chats.forEach(chat => {
+        this.chats.forEach(({ chatlog }) => {
             try {
-                if (Array.isArray(chat.data)) {
-                    log(4, 'Controller: Migrating array data for chat', chat.id);
-                    const temp = new Chatlog();
-                    chat.data.forEach(msg => temp.addMessage(msg));
-                    chat.data = temp.toJSON();
-                    migrated = true;
-                }
-                const tempLog = new Chatlog();
-                tempLog.load(chat.data);
-                const first = tempLog.getFirstMessage();
-                if (!first || first.value.role !== 'system') {
-                    log(4, 'Controller: Adding system prompt during migration for chat', chat.id);
-                    const oldRoot = tempLog.rootAlternatives;
-                    tempLog.rootAlternatives = new Alternatives();
-                    const sysMsg = tempLog.rootAlternatives.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
-                    sysMsg.answerAlternatives = oldRoot;
-                    chat.data = tempLog.toJSON();
-                    migrated = true;
-                }
+                // System prompt check already done
             } catch (err) {
                 log(1, 'Controller: Failed to migrate chat', err);
                 triggerError('Failed to migrate chat:', err);
@@ -265,7 +258,7 @@ class Controller {
         });
         if (migrated || legacyLoaded) {
             log(3, 'Controller: Persisting migrated/legacy chats');
-            localStorage.setItem('gptChat_chats', JSON.stringify(this.chats));
+            this.persistChats();
         }
         this.currentChatId = localStorage.getItem('gptChat_currentChatId');
     }
@@ -422,7 +415,7 @@ class Controller {
             log(4, 'Controller: Save chat button clicked');
             const current = this.chats.find(c => c.id === this.currentChatId);
             if (!current) return;
-            const jsonData = JSON.stringify({ title: current.title, data: current.data });
+            const jsonData = JSON.stringify({ title: current.title, data: current.chatlog.toJSON() });
             const blob = new Blob([jsonData], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -449,9 +442,11 @@ class Controller {
                         } else if (!data && typeof loaded === 'object') {
                             data = loaded;
                         }
+                        const chatlog = new Chatlog();
+                        chatlog.load(data);
                         const id = Date.now().toString();
                         const title = loaded.title || 'Imported Chat';
-                        this.chats.push({ id, title, data });
+                        this.chats.push({ id, title, chatlog });
                         this.switchChat(id);
                         this.updateChatList();
                         this.persistChats();
@@ -517,7 +512,7 @@ class Controller {
         });
     }
 
-    async streamAPIResponse(payload) {
+    async streamAPIResponse(payload, targetChatlog, targetMessage) {
         log(4, 'Controller: streamAPIResponse called with payload model', payload.model);
         const headers = {
             'Content-Type': 'application/json'
@@ -565,21 +560,17 @@ class Controller {
             if (delta === '') continue;
             log(5, 'Controller: Received chunk', delta);
             hooks.onChunkReceived.forEach(fn => fn(delta));
-            const lastMessage = this.chatlog.getLastMessage();
-            if (lastMessage.value === null) {
-                lastMessage.value = { role: 'assistant', content: delta };
-            } else {
-                lastMessage.value.content += delta;
+            targetMessage.appendContent(delta);
+            if (targetChatlog === this.chatlog) {
+                targetChatlog.notify();
             }
-            lastMessage.cache = null;
-            this.ui.chatlogEl.update();
         }
-        const lastMessage = this.chatlog.getLastMessage();
-        hooks.onMessageComplete.forEach(fn => fn(lastMessage, this.ui.chatlogEl));
+        const lastMessage = targetChatlog.getLastMessage();
+        hooks.onMessageComplete.forEach(fn => fn(lastMessage, targetChatlog, this.ui.chatlogEl));
     }
 
-    async generateAIResponse(options = {}) {
-        log(3, 'Controller: generateAIResponse called with options', options);
+    async generateAIResponse(options = {}, targetChatlog = this.chatlog) {
+        log(3, 'Controller: generateAIResponse called with options', options, 'targetChatlog id', this.chats.find(c => c.chatlog === targetChatlog)?.id);
         if (this.store.get('receiving')) return;
         let model = options.model || document.querySelector('input[name="model"]:checked')?.value;
         if (model === 'custom') {
@@ -598,10 +589,11 @@ class Controller {
         const temperature = options.temperature ?? Number(this.ui.temperatureEl.value);
         const topP = options.top_p ?? Number(this.ui.topPEl.value);
         this.store.set('receiving', true);
+        const targetMessage = targetChatlog.getLastMessage();
         try {
             let payload = {
                 model,
-                messages: this.chatlog.getActiveMessageValues(),
+                messages: targetChatlog.getActiveMessageValues(),
                 temperature,
                 top_p: topP,
                 stream: true
@@ -614,44 +606,43 @@ class Controller {
                 }
                 payload.messages[0].content = systemContent;
             }
-            for (let fn of hooks.beforeApiCall) {
-                const modified = fn(payload, this.ui.chatlogEl);
-                if (modified) payload = modified;
-            }
-            await this.streamAPIResponse(payload);
+            payload = hooks.beforeApiCall.reduce((p, fn) => fn(p, this.ui.chatlogEl) || p, payload);
+            await this.streamAPIResponse(payload, targetChatlog, targetMessage);
         } catch (error) {
             if (error.name === 'AbortError') {
                 log(3, 'Controller: Response aborted');
                 this.store.set('controller', new AbortController());
-                const lastMessage = this.chatlog.getLastMessage();
+                const lastMessage = targetChatlog.getLastMessage();
                 if (lastMessage && lastMessage.value === null) {
                     // Remove dangling null message on abort
-                    const lastAlternatives = this.chatlog.getLastAlternatives();
+                    const lastAlternatives = targetChatlog.getLastAlternatives();
                     lastAlternatives.messages.pop();
                     lastAlternatives.activeMessageIndex = lastAlternatives.messages.length - 1;
-                    this.chatlog.notify();
+                    targetChatlog.notify();
                 } else if (lastMessage) {
-                    lastMessage.value.content += '\n\n[Response aborted by user]';
+                    lastMessage.appendContent('\n\n[Response aborted by user]');
                     lastMessage.cache = null;
                 }
                 return;
             }
             log(1, 'Controller: generateAIResponse error', error);
-            const lastMessage = this.chatlog.getLastMessage();
+            const lastMessage = targetChatlog.getLastMessage();
             if (lastMessage.value === null) {
                 lastMessage.value = { role: 'assistant', content: `${error}` };
                 hooks.afterMessageAdd.forEach(fn => fn(lastMessage));
             } else {
-                lastMessage.value.content += `\n\n${error}`;
+                lastMessage.appendContent(`\n\n${error}`);
             }
             lastMessage.cache = null;
         } finally {
             this.store.set('receiving', false);
-            const lastMessage = this.chatlog.getLastMessage();
-            if (lastMessage.value !== null) {
-                lastMessage.metadata = { model, temperature, top_p: topP };
+            if (targetMessage.value !== null) {
+                targetMessage.metadata = { model, temperature, top_p: topP };
             }
-            this.ui.chatlogEl.update();
+            if (targetChatlog === this.chatlog) {
+                targetChatlog.notify();
+            }
+            this.persistChats();
         }
     }
 
@@ -661,7 +652,7 @@ class Controller {
             log(4, 'Controller: Editing message at pos', this.store.get('editingPos'));
             const msg = this.chatlog.getNthMessage(this.store.get('editingPos'));
             if (msg) {
-                msg.value.content = message.trim();
+                msg.setContent(message.trim());
                 msg.cache = null;
                 this.ui.chatlogEl.update();
             }
@@ -696,7 +687,7 @@ class Controller {
         }
         this.store.set('regenerateLastAnswer', false);
         this.ui.chatlogEl.update();
-        await this.generateAIResponse();
+        await this.generateAIResponse({}, this.chatlog);
     }
 }
 

@@ -78,7 +78,7 @@ export const mcpPlugin = {
             return payload;
         },
         // Processes completed assistant messages: parses tool calls, executes them via MCP, adds tool outputs to chatlog, and auto-continues the assistant response.
-        onMessageComplete: function (message, chatbox) {
+        onMessageComplete: function (message, chatlog, chatbox) {
             log(5, 'mcpPlugin: onMessageComplete called for role', message.value?.role);
             if (!message.value || message.value.role !== 'assistant') return;
             const { toolCalls, positions } = parseFunctionCalls(message.value.content);
@@ -140,14 +140,14 @@ export const mcpPlugin = {
                         toolContents += `<dma:tool_response tool_call_id="${id}">\n${inner}\n</dma:tool_response>\n`;
                     });
                     if (toolContents !== '') {
-                        chatbox.chatlog.addMessage({ role: 'tool', content: toolContents });
+                        chatlog.addMessage({ role: 'tool', content: toolContents });
                     }
                     // Auto-continue by streaming new assistant response.
                     const controller = chatbox.store.get('controllerInstance');
-                    const chatlog = chatbox.chatlog;
+                    // const chatlog = chatbox.chatlog;
                     chatlog.addMessage(null); // Add placeholder for new response.
                     chatbox.update(); // Update UI (with scroll, as new messages added).
-                    controller.generateAIResponse(); // Generate continuation.
+                    controller.generateAIResponse({}, chatlog); // Generate continuation.
                 });
             }
         },
