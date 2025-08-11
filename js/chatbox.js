@@ -143,6 +143,12 @@ class Chatbox {
             messageInput.value = message.value.content.trim();
             messageInput.dispatchEvent(new Event('input', { bubbles: true }));
             this.store.set('editingPos', pos);
+            const roleRadio = document.getElementById(message.value.role);
+            if (roleRadio) {
+                roleRadio.checked = true;
+            } else {
+                document.getElementById('user').checked = true;
+            }
             messageInput.focus();
         });
         el.querySelector('.msg_mod-del-btn').addEventListener('click', () => {

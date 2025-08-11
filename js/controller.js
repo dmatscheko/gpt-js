@@ -652,11 +652,13 @@ class Controller {
             log(4, 'Controller: Editing message at pos', this.store.get('editingPos'));
             const msg = this.chatlog.getNthMessage(this.store.get('editingPos'));
             if (msg) {
+                msg.value.role = userRole;
                 msg.setContent(message.trim());
                 msg.cache = null;
                 this.ui.chatlogEl.update();
             }
             this.store.set('editingPos', null);
+            document.getElementById('user').checked = true;
             return;
         }
         if (!this.store.get('regenerateLastAnswer') && !message) return;
