@@ -144,7 +144,6 @@ export const mcpPlugin = {
                     }
                     // Auto-continue by streaming new assistant response.
                     const controller = chatbox.store.get('controllerInstance');
-                    // const chatlog = chatbox.chatlog;
                     chatlog.addMessage(null); // Add placeholder for new response.
                     chatbox.update(); // Update UI (with scroll, as new messages added).
                     controller.generateAIResponse({}, chatlog); // Generate continuation.
