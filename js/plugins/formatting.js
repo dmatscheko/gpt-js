@@ -3,32 +3,31 @@
 import { triggerError } from '../utils.js';
 import { log } from '../utils.js';
 
+// Each plugin applies transformations like SVG normalization, thinking tags, Markdown, KaTeX, and clip badges.
 export const formattingPlugins = [
     {
         name: 'svg_normalization',
         hooks: {
+            // Plugin to normalize SVG. Wraps SVGs in code blocks and fixes data URIs.
             onFormatContent: function (text) {
                 log(5, 'formattingPlugins: svg_normalization onFormatContent called');
                 text = text.replace(/((?:```\w*?\s*?)|(?:<render_component[^>]*?>\s*?)|)(<svg[^>]*?>)([\s\S]*?)(<\/svg>(?:\s*?```|\s*?<\/render_component>|)|$)/gi,
                     (match, prefix, svgStart, content, closing) => {
-                        let output = '```svg\n' + svgStart;  // svgStart includes '<svg' + initial attrs/spaces if any
-                        // If closing tag was captured (complete SVG), add it and close the code block
+                        let output = '```svg\n' + svgStart;
                         if (closing?.startsWith('</svg>')) {
                             output += content + '</svg>\n```';
                         } else {
-                            // Incomplete: don't add </svg> or closing ```
+                            // Incomplete: don't add </svg> or closing ```.
                             output += content;
                         }
                         return output;
                     }
                 );
-
                 text = text.replace(/\(data:image\/svg\+xml,([a-z0-9_"'%+-]+?)\)/gmi, (match, g1) => {
                     let data = decodeURIComponent(g1);
                     data = data.replace(/<svg\s/gmi, '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" ');
                     return `(data:image/svg+xml,${encodeURIComponent(data)})`;
                 });
-
                 return text;
             }
         }
@@ -36,11 +35,11 @@ export const formattingPlugins = [
     {
         name: 'think',
         hooks: {
+            // Plugin to handle <think> tags. Converts them to collapsible HTML details elements.
             onFormatContent: function (text) {
                 log(5, 'formattingPlugins: think onFormatContent called');
-                // Replace complete <think>...</think> with collapsed details
                 text = text.replace(/<think>([\s\S]*?)<\/think>/g, '<details class="think"><summary>Thinking</summary><div class="think-content">$1</div></details>');
-                // Handle unmatched <think> at the end with open details
+                // Unmatched <think> at the end with open details.
                 text = text.replace(/<think>([\s\S]*)$/, '<details open class="think"><summary>Thinking</summary><div class="think-content">$1</div></details>');
                 return text;
             }
@@ -49,16 +48,18 @@ export const formattingPlugins = [
     {
         name: 'markdown',
         hooks: {
+            // Plugin for Markdown rendering using markdown-it and syntax highlighting with highlight.js.
             onFormatContent: function (text) {
                 log(5, 'formattingPlugins: markdown onFormatContent called');
                 const mdSettings = {
-                    html: false,
-                    xhtmlOut: false,
-                    breaks: false,
-                    langPrefix: 'language-',
-                    linkify: true,
-                    typographer: false,
-                    quotes: `""''`,
+                    html: false, // Disable HTML tags in source.
+                    xhtmlOut: false, // Use '/' to close single tags (<br />).
+                    breaks: false, // Convert '\n' in paragraphs into <br>.
+                    langPrefix: 'language-', // CSS language prefix for fenced blocks.
+                    linkify: true, // Autoconvert URL-like text to links.
+                    typographer: false, // Enable some language-neutral replacement + quotes beautification.
+                    quotes: `""''`, // Double + single quotes replacement pairs.
+                    // Highlight function for code blocks.
                     highlight: function (code, language) { // This needs to be a regular function, because arrow functions do not bind their own "this"-context and this.langPrefix would not be accessible.
                         let value = '';
                         try {
@@ -84,6 +85,7 @@ export const formattingPlugins = [
     {
         name: 'katex',
         hooks: {
+            // Plugin for rendering LaTeX math with KaTeX.
             onPostFormatContent: function (wrapper) {
                 log(5, 'formattingPlugins: katex onPostFormatContent called');
                 const origFormulas = [];
@@ -119,6 +121,7 @@ export const formattingPlugins = [
     {
         name: 'clipbadge',
         hooks: {
+            // Plugin to add copy-to-clipboard badges to code blocks and tables.
             onRenderMessage: function (el, message, chatbox) {
                 log(5, 'formattingPlugins: clipbadge onRenderMessage called');
                 const tableToCSV = (table) => {
@@ -178,7 +181,7 @@ class ClipBadge {
             this.init();
         }
     }
-
+    // Default settings.
     defaults = {
         templateSelector: '#clip-badge-template',
         contentSelector: 'body',
@@ -208,7 +211,6 @@ class ClipBadge {
             language = '';
             htmlText = highlightEl.innerHTML;
         }
-
         if (highlightEl.classList.contains('hljs-message')) {
             language = '';
             const right = highlightEl.querySelector('small > span > span.right');
@@ -217,16 +219,15 @@ class ClipBadge {
                 right.remove();
             }
         }
-
         const badge = this.settings.template.cloneNode(true);
         badge.classList.add('clip-badge');
         badge.querySelector('.clip-badge-language').textContent = language;
-
         if (svgText) {
             const swapBtn = badge.querySelector('.clip-badge-swap');
             swapBtn.classList.add('clip-badge-swap-enabled');
             swapBtn.dataset.showing = 'html';
             swapBtn.innerHTML = this.settings.codeButtonContent;
+            // Event to swap between code and image view.
             swapBtn.addEventListener('click', () => {
                 log(5, 'ClipBadge: Swap button clicked, current showing', swapBtn.dataset.showing);
                 if (swapBtn.dataset.showing === 'html') {
@@ -241,23 +242,19 @@ class ClipBadge {
                 highlightEl.insertAdjacentElement('afterbegin', badge);
             });
         }
-
         const copyIcon = badge.querySelector('.clip-badge-copy-icon');
         copyIcon.className = this.settings.copyIconClass;
         copyIcon.classList.add('clip-badge-copy-icon');
         copyIcon.innerHTML = this.settings.copyIconContent;
-
         copyIcon.addEventListener('click', event => {
             log(5, 'ClipBadge: Copy icon clicked');
             event.preventDefault();
             event.stopPropagation();
             if (copyIcon.classList.contains('text-success')) return;
-
             let textToCopy = plainText;
             if (this.settings.onBeforeCodeCopied) {
                 textToCopy = this.settings.onBeforeCodeCopied(plainText, highlightEl);
             }
-
             const setCopied = () => {
                 copyIcon.className = this.settings.checkIconClass;
                 copyIcon.classList.add('clip-badge-copy-icon');
@@ -268,7 +265,7 @@ class ClipBadge {
                     copyIcon.innerHTML = this.settings.copyIconContent;
                 }, 2000);
             };
-
+            // Use Clipboard API if available.
             if (navigator.clipboard?.write) {
                 const clipboardData = { 'text/plain': new Blob([textToCopy], { type: 'text/plain' }) };
                 if (htmlText) clipboardData['text/html'] = new Blob([htmlText], { type: 'text/html' });
@@ -277,6 +274,7 @@ class ClipBadge {
                     triggerError('Clipboard API failed:', err);
                 });
             } else {
+                // Fallback to textarea method.
                 const textArea = document.createElement('textarea');
                 textArea.value = textToCopy;
                 textArea.style.position = 'fixed';
@@ -298,7 +296,6 @@ class ClipBadge {
                 document.body.removeChild(textArea);
             }
         });
-
         highlightEl.classList.add('clip-badge-pre');
         highlightEl.insertAdjacentElement('afterbegin', badge);
     }
@@ -308,6 +305,7 @@ class ClipBadge {
         log(5, 'ClipBadge: getTemplate called');
         let node = document.querySelector(this.settings.templateSelector);
         if (!node) {
+            // Create default template if not found.
             node = document.createElement('template');
             node.innerHTML = `
 <style>

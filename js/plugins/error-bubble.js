@@ -1,8 +1,10 @@
 'use strict';
 
 import { log } from '../utils.js';
+
 let timeoutId = null;
 
+// Plugin for displaying error messages in a bubble UI element.
 export const errorBubblePlugin = {
     name: 'error-bubble',
     hooks: {
@@ -11,7 +13,7 @@ export const errorBubblePlugin = {
             if (args.length === 0) {
                 args = ['Unknown error'];
             }
-
+            // Format each argument into a string for display.
             const formattedParts = args.map(arg => {
                 if (arg instanceof Error) {
                     return arg.message;
@@ -21,7 +23,6 @@ export const errorBubblePlugin = {
                     return String(arg);
                 }
             });
-
             const bubble = document.getElementById('error-bubble');
             if (!bubble) return;
             const content = document.getElementById('error-bubble-content');
@@ -33,7 +34,6 @@ export const errorBubblePlugin = {
                 messageEl.style.backgroundColor = '#772222a0';
                 messageEl.style.padding = '5px';
                 messageEl.style.borderRadius = '10px';
-
                 // Split the part into lines and create elements for each
                 const lines = part.split('\n');
                 lines.forEach((line, index) => {
@@ -45,10 +45,8 @@ export const errorBubblePlugin = {
                     }
                     messageEl.appendChild(lineEl);
                 });
-
                 content.appendChild(messageEl);
             });
-
             bubble.style.display = 'block';
             bubble.classList.remove('hiding');
             if (timeoutId) clearTimeout(timeoutId);
@@ -66,6 +64,6 @@ function hideBubble() {
         bubble.style.display = 'none';
         bubble.classList.remove('hiding');
         document.getElementById('error-bubble-content').innerHTML = '';
-    }, { once: true });
+    }, { once: true }); // One-time listener.
 }
 document.getElementById('error-bubble-close').addEventListener('click', hideBubble);

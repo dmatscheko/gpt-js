@@ -18,17 +18,17 @@ const avatarPong = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" 
 <rect x="25" y="60" width="30" height="5" fill="#ffffff" />
 </svg>`;
 
+// Plugin for handling avatars, allowing custom uploads via localStorage.
 export const avatarsPlugin = {
     name: 'avatars',
     hooks: {
         onRenderMessage: function (el, message, chatbox) {
             log(4, 'avatarsPlugin: Rendering avatar for role', message.value.role);
-            let type = 'ping';
-            if (message.value.role === 'assistant') type = 'pong';
-
+            let type = 'ping'; // Default to user avatar type.
+            if (message.value.role === 'assistant') type = 'pong'; // Switch to assistant type if role is assistant.
             const avatar = document.createElement('img');
             let avatarSrc = localStorage.getItem(`gptChat_${type}Avatar`);
-            const isCustom = !!avatarSrc;
+            const isCustom = !!avatarSrc; // Check if a custom avatar is set.
             avatar.classList.add('avatar');
             if (localStorage) avatar.classList.add('clickable');
             avatar.src = avatarSrc || `data:image/svg+xml,${encodeURIComponent(type === 'ping' ? avatarPing : avatarPong)}`;
@@ -41,7 +41,7 @@ export const avatarsPlugin = {
                     avatar.src = `data:image/svg+xml,${encodeURIComponent(type === 'ping' ? avatarPing : avatarPong)}`;
                     localStorage.removeItem(`gptChat_${type}Avatar`);
                     chatbox.chatlog.clearCache();
-                    chatbox.update(false);
+                    chatbox.update(false); // Update UI.
                     return;
                 }
                 const input = document.createElement('input');
@@ -62,13 +62,14 @@ export const avatarsPlugin = {
                         triggerError('File too large. Maximum size is 2MB.');
                         return;
                     }
+                    // Read the file as Data URL.
                     const reader = new FileReader();
                     reader.addEventListener('load', () => {
                         log(4, 'avatarsPlugin: File loaded successfully');
                         localStorage.setItem(`gptChat_${type}Avatar`, reader.result);
                         avatar.src = reader.result;
                         chatbox.chatlog.clearCache();
-                        chatbox.update(false);
+                        chatbox.update(false); // Update UI.
                     });
                     reader.addEventListener('error', () => {
                         log(1, 'avatarsPlugin: Failed to read file');
