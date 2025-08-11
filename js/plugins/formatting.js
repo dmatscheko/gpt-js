@@ -77,7 +77,7 @@ export const formattingPlugins = [
                     }
                 };
                 const md = window.markdownit(mdSettings);
-                md.validateLink = link => !link.startsWith('javascript:');
+                md.validateLink = link => !['javascript:', 'dma:'].some(prefix => link.startsWith(prefix));
                 return md.render(text);
             }
         }

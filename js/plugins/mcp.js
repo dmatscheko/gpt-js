@@ -185,26 +185,31 @@ function parseFunctionCalls(content) {
     log(5, 'mcpPlugin: parseFunctionCalls called');
     const toolCalls = [];
     const positions = [];
-    const startRegex = /<dma:function_call\s*(?:[^>]*?)>/gi;
+    const fullRegex = /(<dma:function_call\s*[^>]*?\/>)|(<dma:function_call\s*[^>]*?>[\s\S]*?<\/dma:function_call\s*>)/gi;
     let match;
-    let lastIndex = 0;
-    while ((match = startRegex.exec(content)) !== null) {
+    while ((match = fullRegex.exec(content)) !== null) {
+        let snippet;
+        if (match[1]) {
+            // Self-closing tag
+            snippet = match[1];
+        } else if (match[2]) {
+            // Non-self-closing tag
+            snippet = match[2];
+        } else {
+            continue;
+        }
         const startIndex = match.index;
-        const endIndex = content.indexOf('</dma:function_call>', startIndex);
-        if (endIndex === -1) break;
-        const snippet = content.substring(startIndex, endIndex + 20);
+        const endIndex = startIndex + match[0].length;
         const parser = new DOMParser();
         const doc = parser.parseFromString(`<root>${snippet}</root>`, 'application/xml');
         if (doc.documentElement.localName === 'parsererror') {
             log(2, 'mcpPlugin: Invalid XML snippet in parseFunctionCalls');
-            lastIndex = startIndex + snippet.length;
             continue;
         }
         const functionCallNode = doc.querySelector('dma\\:function_call');
         if (functionCallNode) {
             if (functionCallNode.getAttribute('handled') === 'true') {
                 log(4, 'mcpPlugin: Skipping already handled tool call');
-                lastIndex = endIndex + 20;
                 continue;
             }
             const name = functionCallNode.getAttribute('name');
@@ -216,9 +221,8 @@ function parseFunctionCalls(content) {
                 params[param.getAttribute('name')] = value;
             });
             toolCalls.push({ name, params });
-            positions.push({ start: startIndex, end: endIndex + 20 });
+            positions.push({ start: startIndex, end: endIndex });
         }
-        lastIndex = endIndex + 20;
     }
     log(4, 'mcpPlugin: Parsed tool calls', toolCalls.length);
     return { toolCalls, positions };
