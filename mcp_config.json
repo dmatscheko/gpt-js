@@ -6,7 +6,16 @@
       "args": [
         "fastmcp",
         "run",
-        "./_mcp_servers/date_time.py"
+        "./_mcp_servers/datetime-mcp/datetime-mcp.py"
+      ]
+    },
+    {
+      "name": "fetch",
+      "command": "uvx",
+      "args": [
+        "fastmcp",
+        "run",
+        "./_mcp_servers/fetch-mcp/fetch-mcp.py"
       ]
     }
   ]

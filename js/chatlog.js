@@ -21,7 +21,7 @@ class Message {
 
     // Serializes the message to JSON.
     toJSON() {
-        log(5, 'Message: toJSON called');
+        log(6, 'Message: toJSON called');
         return {
             value: this.value,
             metadata: this.metadata,
@@ -115,7 +115,7 @@ class Alternatives {
     }
 
     toJSON() {
-        log(5, 'Alternatives: toJSON called');
+        log(6, 'Alternatives: toJSON called');
         return {
             messages: this.messages.map(msg => msg ? msg.toJSON() : null),
             activeMessageIndex: this.activeMessageIndex

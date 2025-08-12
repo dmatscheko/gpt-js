@@ -34,6 +34,8 @@ example_arg_value2
 </dma:function_call>
 Do not escape any of the function call arguments. The arguments will be parsed as normal text. There is one exception: If you need to write </dma:function_call> or </parameter> as value inside a <parameter>, write it like <\/dma:function_call> or <\/parameter>.
 
+Do not use the attributes "tool_call_id" or "handled" in the <dma:function_call> tags, even if you read them in your own messages. These attributes are reserved and are added automatically to your messages by the system, to show which tool calls belong to which responses and which tool calls have already been processed.
+
 You can use multiple tools in parallel by calling them together.
 
 ### Available Tools:
