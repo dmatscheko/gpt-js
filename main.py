@@ -333,5 +333,8 @@ if __name__ == "__main__":
     logging.trace("Threads started")
     webbrowser.open("http://localhost:8000")
     logging.trace("Browser opened")
-    while True:
-        time.sleep(1)
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logging.info("Received Ctrl+C, shutting down...")
