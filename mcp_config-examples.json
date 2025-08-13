@@ -1,0 +1,18 @@
+{
+  "datetime": {
+    "command": "uvx",
+    "args": ["fastmcp", "run", "./_mcp_servers/datetime-mcp/datetime-mcp.py"]
+  },
+  "fetch": {
+    "command": "uvx",
+    "args": ["fastmcp", "run", "./_mcp_servers/fetch-mcp/fetch-mcp.py"]
+  },
+  "weather": {
+    "url": "https://weather-api.example.com/mcp",
+    "transport": "http"
+  },
+  "calendar": {
+    "url": "https://calendar-api.example.com/mcp",
+    "transport": "http"
+  }
+}

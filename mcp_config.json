@@ -1,22 +1,18 @@
 {
-  "backends": [
-    {
-      "name": "datetime",
-      "command": "uvx",
-      "args": [
-        "fastmcp",
-        "run",
-        "./_mcp_servers/datetime-mcp/datetime-mcp.py"
-      ]
-    },
-    {
-      "name": "fetch",
-      "command": "uvx",
-      "args": [
-        "fastmcp",
-        "run",
-        "./_mcp_servers/fetch-mcp/fetch-mcp.py"
-      ]
-    }
-  ]
+  "datetime": {
+    "command": "uvx",
+    "args": [
+      "fastmcp",
+      "run",
+      "./_mcp_servers/datetime-mcp/datetime-mcp.py"
+    ]
+  },
+  "fetch": {
+    "command": "uvx",
+    "args": [
+      "fastmcp",
+      "run",
+      "./_mcp_servers/fetch-mcp/fetch-mcp.py"
+    ]
+  }
 }

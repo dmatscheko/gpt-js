@@ -8,13 +8,16 @@ if (autoMcpEndpoint !== '' && (localStorage.getItem('gptChat_mcpServer') == null
 }
 let cachedToolsSection = '';
 const mcpUrl = localStorage.getItem('gptChat_mcpServer');
+let mcpSessionId = mcpUrl ? localStorage.getItem(`gptChat_mcpSession_${mcpUrl}`) || null : null;
+let isInitialized = false;
 if (mcpUrl && !cachedToolsSection) {
-    log(4, 'mcpPlugin: Pre-fetching tools section from MCP', mcpUrl);
-    mcpJsonRpc('get_tools_section').then(response => {
-        cachedToolsSection = response;
+    log(4, 'mcpPlugin: Pre-fetching tools from MCP', mcpUrl);
+    mcpJsonRpc('tools/list').then(response => {
+        const toolsArray = Array.isArray(response.tools) ? response.tools : [];
+        cachedToolsSection = generateToolsSection(toolsArray);
         log(3, 'mcpPlugin: Tools section cached successfully');
     }).catch(error => {
-        log(1, 'mcpPlugin: Failed to pre-fetch tools section', error);
+        log(1, 'mcpPlugin: Failed to pre-fetch tools', error);
         cachedToolsSection = '';
     });
 }
@@ -104,7 +107,7 @@ export const mcpPlugin = {
                 Promise.all(toolCalls.map(async (tc, index) => {
                     log(4, 'mcpPlugin: Executing tool', tc.name, 'with params', tc.params);
                     try {
-                        const result = await mcpJsonRpc('call_tool', { name: tc.name, arguments: tc.params });
+                        const result = await mcpJsonRpc('tools/call', { name: tc.name, arguments: tc.params });
                         // Add sources to metadata for certain tools.
                         if (tc.name === 'web_search' || tc.name === 'browse_page' || tc.name.startsWith('x_')) {
                             message.metadata = { ...message.metadata || {}, sources: result.sources || [] };
@@ -182,6 +185,29 @@ export const mcpPlugin = {
     }
 };
 
+// Function to generate the tools Markdown section from a list of tools.
+function generateToolsSection(tools) {
+    const sections = [];
+    tools.forEach((tool, idx) => {
+        const desc = tool.description || 'No description provided.';
+        const action = tool.name;
+        const displayName = action.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        let argsStr = '';
+        const properties = tool.inputSchema?.properties || {};
+        const requiredSet = new Set(tool.inputSchema?.required || []);
+        Object.entries(properties).forEach(([name, arg]) => {
+            const argDesc = arg.description || arg.title || 'No description.';
+            const argType = arg.type || 'unknown';
+            const required = requiredSet.has(name) ? '(required)' : '(optional)';
+            const defaultStr = arg.default !== undefined ? ` (default: ${JSON.stringify(arg.default)})` : '';
+            argsStr += `   - \`${name}\`: ${argDesc} (type: ${argType})${required}${defaultStr}\n`;
+        });
+        const section = `${idx + 1}. **${displayName}**\n - **Description**: ${desc}\n - **Action** (dma:function_call name): \`${action}\`\n - **Arguments** (parameter name): \n${argsStr}\n`;
+        sections.push(section);
+    });
+    return sections.join('\n');
+}
+
 // Parser for <dma:function_call> tags that extracts tool calls without full-content XML parsing.
 function parseFunctionCalls(content) {
     log(5, 'mcpPlugin: parseFunctionCalls called');
@@ -230,40 +256,154 @@ function parseFunctionCalls(content) {
     return { toolCalls, positions };
 }
 
-// Performs JSON-RPC calls to the MCP server for tool execution.
-async function mcpJsonRpc(method, params = {}) {
-    log(5, 'mcpPlugin: mcpJsonRpc called with method', method, 'params', params);
+// Initializes the MCP session per spec if not already done.
+async function initMcpSession() {
+    if (isInitialized) return;
+    log(4, 'mcpPlugin: Initializing MCP session');
+    const initParams = {
+        protocolVersion: '2025-03-26', // Latest from spec; adjust if needed
+        capabilities: {
+            roots: { listChanged: false }, // Minimal; add more if client supports
+            sampling: {} // Declare if client uses sampling
+        },
+        clientInfo: {
+            name: 'GptChatClient',
+            version: '1.0.0'
+        }
+    };
+    const initData = await sendMcpRequest('initialize', initParams, true); // No session for init
+    if (initData.protocolVersion !== '2025-03-26') {
+        throw new Error(`Protocol version mismatch: requested 2025-03-26, got ${initData.protocolVersion}`);
+    }
+    log(4, 'mcpPlugin: Negotiated capabilities', initData.capabilities);
+    // Check if session_id was set from header
+    if (!mcpSessionId) {
+        throw new Error('No session ID returned in initialize response header');
+    }
+    localStorage.setItem(`gptChat_mcpSession_${mcpUrl}`, mcpSessionId);
+    // Send initialized notification
+    await sendMcpRequest('notifications/initialized', {}, false, true); // Notification: no id
+    isInitialized = true;
+    log(4, 'mcpPlugin: MCP session initialized', mcpSessionId);
+}
+
+// Core function to send JSON-RPC requests, handling SSE/JSON and timeouts.
+async function sendMcpRequest(method, params = {}, isInit = false, isNotification = false) {
     const url = localStorage.getItem('gptChat_mcpServer');
     if (!url) throw new Error('No MCP server URL set');
     const body = {
         jsonrpc: '2.0',
         method,
-        params,
-        id: Math.floor(Math.random() * 1000000) // Random ID.
+        params
     };
+    if (!isNotification) {
+        body.id = Math.floor(Math.random() * 1000000);
+    }
+    const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream'
+    };
+    if (mcpSessionId && !isInit) {
+        headers['mcp-session-id'] = mcpSessionId;
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
     try {
         const resp = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            headers,
+            body: JSON.stringify(body),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
         if (!resp.ok) {
-            const errorText = await resp.text(); // Fetch body for more details.
+            const errorText = await resp.text();
             log(1, 'mcpPlugin: MCP response not ok', resp.status, resp.statusText, errorText);
             throw new Error(`MCP error: ${resp.statusText} - ${errorText}`);
         }
-        const data = await resp.json();
-        if (data.error) {
-            log(1, 'mcpPlugin: MCP JSON-RPC error', data.error);
-            throw new Error(data.error.message || 'MCP call failed');
+        const respHeaders = Object.fromEntries(resp.headers.entries());
+        log(5, 'mcpPlugin: Full response headers', respHeaders);
+        // Handle session_id from header if in response
+        const headerSession = resp.headers.get('mcp-session-id');
+        log(5, 'mcpPlugin: Checked mcp-session-id header', headerSession);
+        if (headerSession) {
+            mcpSessionId = headerSession;
+            localStorage.setItem(`gptChat_mcpSession_${mcpUrl}`, mcpSessionId);
         }
-        log(4, 'mcpPlugin: MCP JSON-RPC success', data.result);
-        return data.result;
+        if (isNotification) {
+            // Notifications do not expect a response body or result
+            return null;
+        }
+        const contentType = resp.headers.get('Content-Type') || '';
+        if (contentType.includes('application/json')) {
+            const data = await resp.json();
+            if (data.error) {
+                log(1, 'mcpPlugin: MCP JSON-RPC error', data.error);
+                throw new Error(data.error.message || 'MCP call failed');
+            }
+            return data.result;
+        } else if (contentType.includes('text/event-stream')) {
+            // Parse SSE: Collect data from 'message' events
+            const reader = resp.body.getReader();
+            let buffer = '';
+            let result = null;
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += new TextDecoder().decode(value);
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Last incomplete line
+                for (const line of lines) {
+                    if (line.startsWith('event: message')) {
+                        // Next line should be data:
+                    } else if (line.startsWith('data: ')) {
+                        const dataStr = line.slice(6);
+                        try {
+                            const partial = JSON.parse(dataStr);
+                            if (partial.jsonrpc) {
+                                result = partial.result; // Assume last message has full result
+                            }
+                        } catch {} // Ignore partial JSON
+                    }
+                }
+            }
+            if (result) return result;
+            throw new Error('Invalid SSE response: No valid JSON-RPC result');
+        } else {
+            throw new Error(`Unexpected Content-Type: ${contentType}`);
+        }
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error('MCP request timed out');
+        }
+        throw error;
+    }
+}
+
+// Performs JSON-RPC calls to the MCP server for operational methods.
+async function mcpJsonRpc(method, params = {}, retry = false) {
+    log(5, 'mcpPlugin: mcpJsonRpc called with method', method, 'params', params);
+    try {
+        await initMcpSession(); // Ensure lifecycle is complete
+        const result = await sendMcpRequest(method, params);
+        log(4, 'mcpPlugin: MCP JSON-RPC success', result);
+        return result;
     } catch (error) {
         log(1, 'mcpPlugin: MCP JSON-RPC failure', error);
+        // Handle session-related errors by resetting and retrying once
+        if (error.message.includes('Missing session ID') || error.message.includes('No valid session ID') || error.message.includes('Invalid session ID')) {
+            localStorage.removeItem(`gptChat_mcpSession_${mcpUrl}`);
+            mcpSessionId = null;
+            isInitialized = false;
+            if (!retry) {
+                log(3, 'mcpPlugin: Retrying MCP call after session re-init');
+                return mcpJsonRpc(method, params, true);
+            }
+        }
         throw new AggregateError(
             [error],
-            `Failed to perform MCP JSON-RPC call.\nURL: ${url}, Method: ${method}, Params: ${JSON.stringify(params)}.\nOriginal error: ${error.message || 'Unknown'}.`
+            `Failed to perform MCP JSON-RPC call.\nURL: ${mcpUrl}, Method: ${method}, Params: ${JSON.stringify(params)}.\nOriginal error: ${error.message || 'Unknown'}.`
         );
     }
 }
