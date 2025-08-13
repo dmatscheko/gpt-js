@@ -113,9 +113,25 @@ export const mcpPlugin = {
                             message.metadata = { ...message.metadata || {}, sources: result.sources || [] };
                             log(4, 'mcpPlugin: Added sources to metadata', result.sources?.length || 0);
                         }
-                        // Conditionally stringify based on result type to avoid extra quotes on strings.
-                        const content = (typeof result === 'object' && result !== null) ? JSON.stringify(result) : String(result);
-                        return { content, error: null };
+                        let trContent = '';
+                        if (result.isError) {
+                            if (result.content && Array.isArray(result.content)) {
+                                trContent = result.content.map(part => part.type === 'text' ? part.text : '').filter(t => t).join('\n');
+                            }
+                            return { content: null, error: trContent || 'Unknown error' };
+                        } else {
+                            if (result.content && Array.isArray(result.content)) {
+                                trContent = result.content.map(part => part.type === 'text' ? part.text : '').filter(t => t).join('\n');
+                            } else if (result.structuredContent) {
+                                trContent = JSON.stringify(result.structuredContent);
+                            } else {
+                                trContent = JSON.stringify(result);
+                            }
+                            if (result.sources && result.sources.length > 0) {
+                                trContent += '\n\nReferences:\n' + result.sources.map((s, i) => `[${i + 1}] ${s.title || 'Source'} - ${s.url}`).join('\n');
+                            }
+                            return { content: trContent, error: null };
+                        }
                     } catch (error) {
                         log(1, 'mcpPlugin: Tool execution error', error);
                         return { content: null, error: error.message || 'Unknown error' };
