@@ -1,5 +1,7 @@
 # GPT JS Chat
 
+> **Warning**: This tool is in development, made as a spare time project, and no warranty is given for any functionality.
+
 An HTML/JS-based chat application that interacts with AI models via the OpenAI-compatible API.
 
 Key capabilities include:
