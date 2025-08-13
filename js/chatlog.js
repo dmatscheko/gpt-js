@@ -168,6 +168,33 @@ class Chatlog {
         return msg;
     }
 
+    // Deletes the message at the nth position in the active path.
+    deleteNthMessage(pos) {
+        log(4, 'Chatlog: deleteNthMessage called for pos', pos);
+        const alternatives = this.getNthAlternatives(pos);
+        if (!alternatives) return;
+        const activeIdx = alternatives.activeMessageIndex;
+        if (activeIdx === -1) return;
+        alternatives.messages.splice(activeIdx, 1);
+        if (alternatives.messages.length === 0) {
+            alternatives.activeMessageIndex = -1;
+            // Prune: Find parent and null out this empty alternatives (if not root)
+            if (pos > 0) {
+                const parentAlternatives = this.getNthAlternatives(pos - 1);
+                if (parentAlternatives) {
+                    const parentMsg = parentAlternatives.getActiveMessage();
+                    if (parentMsg && parentMsg.answerAlternatives === alternatives) {
+                        parentMsg.answerAlternatives = null;
+                    }
+                }
+            }
+        } else {
+            alternatives.activeMessageIndex = Math.min(activeIdx, alternatives.messages.length - 1);
+        }
+        this.clearCache();
+        this.notify();
+    }
+
     // Gets the first message in the active path.
     getFirstMessage() {
         log(5, 'Chatlog: getFirstMessage called');

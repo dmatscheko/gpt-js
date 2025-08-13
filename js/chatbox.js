@@ -153,17 +153,7 @@ class Chatbox {
         });
         el.querySelector('.msg_mod-del-btn').addEventListener('click', () => {
             log(4, 'Chatbox: Delete button clicked for pos', pos);
-            const alternatives = this.chatlog.getNthAlternatives(pos);
-            if (!alternatives) return;
-            const activeIdx = alternatives.activeMessageIndex;
-            if (activeIdx === -1) return;
-            alternatives.messages.splice(activeIdx, 1);
-            if (alternatives.messages.length === 0) {
-                alternatives.activeMessageIndex = -1;
-            } else {
-                alternatives.activeMessageIndex = Math.min(activeIdx, alternatives.messages.length - 1);
-            }
-            this.chatlog.clearCache();
+            this.chatlog.deleteNthMessage(pos);
             this.update(false);
         });
     }
