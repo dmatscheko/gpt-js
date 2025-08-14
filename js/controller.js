@@ -3,7 +3,7 @@
 import { Chatbox } from './chatbox.js';
 import { startMessage, messageSubmit, messageStop } from './config.js';
 import { showLogin, showLogout, triggerError } from './utils.js';
-import { log } from './utils.js';
+import { log, resetEditing } from './utils.js';
 import { hooks, registerPlugin } from './hooks.js';
 import { formattingPlugins } from './plugins/formatting.js';
 import { alternativeNavigationPlugin, messageModificationPlugin } from './plugins/ui-controls.js';
@@ -227,8 +227,14 @@ class Controller {
             }
             if (height > this.clientHeight) this.style.height = `${height}px`;
         });
+        this.ui.messageEl.addEventListener('blur', () => {
+            resetEditing(this.store, this.chatlog, this.ui.chatlogEl);
+        });
         document.addEventListener('keydown', event => {
-            if (event.key === 'Escape') this.store.get('controller').abort();
+            if (event.key === 'Escape') {
+                this.store.get('controller').abort();
+                resetEditing(this.store, this.chatlog, this.ui.chatlogEl);
+            }
         });
         this.ui.newChatButton.addEventListener('click', () => {
             log(4, 'Controller: New chat button clicked');

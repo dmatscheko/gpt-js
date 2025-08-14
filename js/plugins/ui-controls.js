@@ -1,6 +1,6 @@
 'use strict';
 
-import { log } from '../utils.js';
+import { triggerError, log, resetEditing } from '../utils.js';
 
 /**
  * Helper function to create a tool button.
@@ -72,6 +72,12 @@ export const messageModificationPlugin = {
                 () => {
                     log(4, 'Add button clicked for message', message);
                     const controller = store.get('controllerInstance');
+                    const messageInput = controller.ui.messageEl;
+                    if (messageInput.value !== '' && messageInput.value !== message.value.content.trim()) {
+                        triggerError("Chat input is not empty.");
+                        return;
+                    }
+                    resetEditing(store, chatlog, chatbox);
                     if (message.value.role === 'assistant') {
                         // Regenerate AI message
                         chatlog.addAlternative(message, { role: message.value.role, content: null });
@@ -81,7 +87,6 @@ export const messageModificationPlugin = {
                         const pos = chatlog.getMessagePos(message);
                         const originalContent = message.value.content;
                         chatlog.addAlternative(message, { role: message.value.role, content: null });
-                        const messageInput = controller.ui.messageEl;
                         messageInput.value = originalContent ? originalContent.trim() : '';
                         messageInput.dispatchEvent(new Event('input', { bubbles: true }));
                         store.set('editingPos', pos);
@@ -99,6 +104,11 @@ export const messageModificationPlugin = {
                     log(4, 'Edit button clicked for message', message);
                     const controller = store.get('controllerInstance');
                     const messageInput = controller.ui.messageEl;
+                    if (messageInput.value !== '' && messageInput.value !== message.value.content.trim()) {
+                        triggerError("Chat input is not empty.");
+                        return;
+                    }
+                    resetEditing(store, chatlog, chatbox);
                     messageInput.value = message.value.content.trim();
                     messageInput.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -108,7 +118,8 @@ export const messageModificationPlugin = {
                     const roleRadio = document.getElementById(message.value.role);
                     if (roleRadio) roleRadio.checked = true;
 
-                    message.cache = chatbox.formatMessage({ value: { role: message.value.role, content: '🤔...' } }, pos, 7, 78);
+                    const alternatives = chatlog.findAlternativesForMessage(message);
+                    message.cache = chatbox.formatMessage({ value: { role: message.value.role, content: '🤔...' } }, pos, alternatives.activeMessageIndex, alternatives.messages.length);
                     chatbox.update(false);
 
                     messageInput.focus();

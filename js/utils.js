@@ -30,3 +30,20 @@ export function log(level, ...args) {
     const consoles = [console.log, console.error, console.warn, console.info, console.log, console.log, console.log];
     consoles[level](prefix, ...args);
 }
+
+// Reset previous pending edit/add if exists
+export function resetEditing(store, chatlog, chatbox) {
+    const currentEditingPos = store.get('editingPos');
+    if (currentEditingPos !== null) {
+        const prevMsg = chatlog.getNthMessage(currentEditingPos);
+        if (prevMsg) {
+            if (prevMsg.value.content === null) {
+                chatlog.deleteMessage(prevMsg); // Discard uncommitted new alternative
+            } else {
+                prevMsg.cache = null; // Restore original for previous edit
+            }
+        }
+        store.set('editingPos', null);
+        chatbox.update(false);
+    }
+}
