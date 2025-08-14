@@ -26,6 +26,4 @@ export const messageStop = '<svg width="24" height="24" viewBox="0 0 24 24" fill
 
 export const defaultEndpoint = 'https://api.openai.com/v1/chat/completions';
 
-export const autoMcpEndpoint = '';
-
-export const DEBUG_LEVEL = 4; // Debug level: 0: none, 1: errors, 2: warnings, 3: info, 4: debug, 5: trace, 6: full trace including partial AI messages
+export const DEBUG_LEVEL = 5; // Debug level: 0: none, 1: errors, 2: warnings, 3: info, 4: debug, 5: trace, 6: full trace including partial AI messages

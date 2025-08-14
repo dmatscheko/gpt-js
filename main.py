@@ -18,21 +18,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         logging.info(f"WEB: {format % args}")
 
     def do_GET(self):
-        if self.path == "/js/config.js":
-            try:
-                with open("js/config.js", "r") as f:
-                    content = f.read().replace("export const autoMcpEndpoint = '';", "export const autoMcpEndpoint = 'http://127.0.0.1:3000/mcp';")
-                self.send_response(200)
-                self.send_header("Content-type", "application/javascript")
-                self.send_header("Content-Length", len(content))
-                self.end_headers()
-                self.wfile.write(content.encode("utf-8"))
-            except FileNotFoundError:
-                logging.error("js/config.js not found")
-                self.send_error(404, "File not found")
-            except Exception as e:
-                logging.error(f"Error serving /js/config.js: {e}")
-                self.send_error(500, str(e))
+        if self.path == "/api/config":
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            config = {"mcp_endpoint": "http://127.0.0.1:3000/mcp"}
+            self.wfile.write(json.dumps(config).encode("utf-8"))
         else:
             super().do_GET()
 

@@ -1,11 +1,9 @@
 'use strict';
 
-import { firstPrompt } from './config.js';
-import { getDatePrompt, triggerError } from './utils.js';
 import { log } from './utils.js';
 import { hooks } from './hooks.js';
 
-// Class responsible for displaying the chat messages in the UI.
+// Responsible for displaying the chat messages in the UI.
 class Chatbox {
     constructor(chatlog, container, store) {
         log(5, 'Chatbox: Constructor called');
@@ -38,16 +36,16 @@ class Chatbox {
             const msgCnt = alternative.messages.length;
             if (!message.value) {
                 const role = lastRole === 'assistant' ? 'user' : 'assistant';
-                const messageEl = this.#formatMessage({ value: { role, content: '🤔...' } }, pos, msgIdx, msgCnt);
+                const messageEl = this.formatMessage({ value: { role, content: '🤔...' } }, pos, msgIdx, msgCnt);
                 fragment.appendChild(messageEl);
                 break;
             }
             if (message.value.content === null) {
-                const messageEl = this.#formatMessage({ value: { role: message.value.role, content: '🤔...' } }, pos, msgIdx, msgCnt);
+                const messageEl = this.formatMessage({ value: { role: message.value.role, content: '🤔...' } }, pos, msgIdx, msgCnt);
                 fragment.appendChild(messageEl);
                 break;
             }
-            const messageEl = this.#formatMessage(message, pos, msgIdx, msgCnt);
+            const messageEl = this.formatMessage(message, pos, msgIdx, msgCnt);
             fragment.appendChild(messageEl);
             message.cache = messageEl; // Cache the element.
             lastRole = message.value.role;
@@ -69,108 +67,43 @@ class Chatbox {
     }
 
     // Formats a single message as an HTML element.
-    #formatMessage(message, pos, msgIdx, msgCnt) {
-        log(5, 'Chatbox: #formatMessage called for pos', pos);
-        let type = 'ping';
-        if (message.value.role === 'assistant') type = 'pong';
+    formatMessage(message, pos, msgIdx, msgCnt) {
+        log(5, 'Chatbox: formatMessage called for pos', pos);
         const el = document.createElement('div');
-        el.classList.add('message', type, 'hljs-nobg', 'hljs-message');
+        el.classList.add('message', message.value.role === 'assistant' ? 'pong' : 'ping');
         if (message.value.role === 'system') el.classList.add('system');
-        el.dataset.plaintext = encodeURIComponent(message.value.content.trim());
         el.dataset.pos = pos;
-        let msgStat = '';
-        if (msgIdx > 0 || msgCnt > 1) {
-            msgStat = `<button title="Previous Message" class="msg_mod-prev-btn toolButton small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 7.766c0-1.554-1.696-2.515-3.029-1.715l-7.056 4.234c-1.295.777-1.295 2.653 0 3.43l7.056 4.234c1.333.8 3.029-.16 3.029-1.715V7.766zM9.944 12L17 7.766v8.468L9.944 12zM6 6a1 1 0 0 1 1 1v10a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;${msgIdx + 1}/${msgCnt}&nbsp;<button title="Next Message" class="msg_mod-next-btn toolButton small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 7.766c0-1.554 1.696-2.515 3.029-1.715l7.056 4.234c1.295.777 1.295 2.653 0 3.43L8.03 17.949c-1.333.8-3.029-.16-3.029-1.715V7.766zM14.056 12L7 7.766v8.468L14.056 12zM18 6a1 1 0 0 1 1 1v10a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>`;
-        }
-        let model = '';
-        if (message.metadata?.model) {
-            model = `&nbsp;<span class="right">${message.metadata.model}</span>`;
-        }
+
+        // Create header
         const msgTitleStrip = document.createElement('small');
-        let headerContent = `<span class="nobreak"><b>${message.value.role}</b>${model}`;
-        if (msgStat) {
-            headerContent += `&nbsp;&nbsp;${msgStat}`;
+        const roleEl = document.createElement('b');
+        roleEl.textContent = message.value.role;
+        msgTitleStrip.appendChild(roleEl);
+
+        if (message.metadata?.model) {
+            const modelEl = document.createElement('span');
+            modelEl.classList.add('right');
+            modelEl.textContent = ` ${message.metadata.model}         `;
+            msgTitleStrip.appendChild(modelEl);
         }
-        headerContent += `&nbsp;&nbsp;<button title="New Message" class="msg_mod-add-btn toolButton small"><svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button>&nbsp;&nbsp;<button title="Edit Message" class="msg_mod-edit-btn toolButton small"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg></button>&nbsp;&nbsp;<button title="Delete Message" class="msg_mod-del-btn toolButton small"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h4a1 1 0 1 1 0 2h-1.069l-.867 12.142A2 2 0 0 1 17.069 22H6.93a2 2 0 0 1-1.995-1.858L4.07 8H3a1 1 0 0 1 0-2h4V4zm2 2h6V4H9v2zM6.074 8l.857 12H17.07l.857-12H6.074zM10 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm4 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1z" fill="currentColor"/></svg></button></span><br><br>`;
-        msgTitleStrip.innerHTML = headerContent;
+
+        // Create a container for controls and call the hook
+        const controlsContainer = document.createElement('span');
+        controlsContainer.classList.add('message-controls', 'nobreak');
+        hooks.onRenderMessageControls.forEach(fn => fn(controlsContainer, message, this.chatlog, this));
+        msgTitleStrip.appendChild(controlsContainer);
+
         el.appendChild(msgTitleStrip);
+        el.appendChild(document.createElement('br'));
+        el.appendChild(document.createElement('br'));
+
         const formattedContent = this.#formatContent(message.value.content, message);
         if (formattedContent) {
             el.appendChild(formattedContent);
         }
-        this.#attachMessageEvents(el, type, pos, message);
-        if (msgIdx > 0 || msgCnt > 1) {
-            this.#attachNavigationEvents(el);
-        }
+
         hooks.onRenderMessage.forEach(fn => fn(el, message, this));
         return el;
-    }
-
-    // Attaches event listeners to message elements for editing and regeneration.
-    #attachMessageEvents(el, type, pos, message) {
-        log(5, 'Chatbox: #attachMessageEvents called for pos', pos);
-        el.querySelector('.msg_mod-add-btn').addEventListener('click', async () => {
-            log(4, 'Chatbox: Add button clicked for pos', pos, 'type', type);
-            const messageInput = document.getElementById('messageInput');
-            let newMessage = null;
-            if (type === 'ping') {
-                if (pos === 0) {
-                    newMessage = { role: 'system', content: firstPrompt + getDatePrompt() };
-                } else {
-                    if (!messageInput.value) {
-                        messageInput.value = message.value.content.trim();
-                        messageInput.dispatchEvent(new Event('input', { bubbles: true }));
-                        document.getElementById(message.value.role === 'system' ? 'system' : 'user').checked = true;
-                    }
-                }
-            }
-            const alternative = this.chatlog.getNthAlternatives(pos);
-            if (alternative) alternative.addMessage(newMessage);
-            this.update(false);
-            if (type === 'pong') {
-                if (this.store.get('receiving')) this.store.get('controller').abort();
-                setTimeout(() => {
-                    this.store.set('regenerateLastAnswer', true);
-                    document.getElementById('submitButton').click();
-                }, 100);
-                return;
-            }
-            messageInput.focus();
-        });
-        el.querySelector('.msg_mod-edit-btn').addEventListener('click', () => {
-            log(4, 'Chatbox: Edit button clicked for pos', pos);
-            const messageInput = document.getElementById('messageInput');
-            messageInput.value = message.value.content.trim();
-            messageInput.dispatchEvent(new Event('input', { bubbles: true }));
-            this.store.set('editingPos', pos);
-            const roleRadio = document.getElementById(message.value.role);
-            if (roleRadio) {
-                roleRadio.checked = true;
-            } else {
-                document.getElementById('user').checked = true;
-            }
-            messageInput.focus();
-        });
-        el.querySelector('.msg_mod-del-btn').addEventListener('click', () => {
-            log(4, 'Chatbox: Delete button clicked for pos', pos);
-            this.chatlog.deleteNthMessage(pos);
-            this.update(false);
-        });
-    }
-
-    // Attaches navigation events for switching between alternative messages.
-    #attachNavigationEvents(el) {
-        log(5, 'Chatbox: #attachNavigationEvents called');
-        el.querySelector('.msg_mod-prev-btn').addEventListener('click', () => {
-            log(4, 'Chatbox: Prev button clicked for pos', el.dataset.pos);
-            this.chatlog.getNthAlternatives(el.dataset.pos).prev();
-            this.update(false);
-        });
-        el.querySelector('.msg_mod-next-btn').addEventListener('click', () => {
-            log(4, 'Chatbox: Next button clicked for pos', el.dataset.pos);
-            this.chatlog.getNthAlternatives(el.dataset.pos).next();
-            this.update(false);
-        });
     }
 
     // Formats message content.

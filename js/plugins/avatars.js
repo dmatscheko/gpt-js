@@ -41,7 +41,7 @@ export const avatarsPlugin = {
                     avatar.src = `data:image/svg+xml,${encodeURIComponent(type === 'ping' ? avatarPing : avatarPong)}`;
                     localStorage.removeItem(`gptChat_${type}Avatar`);
                     chatbox.chatlog.clearCache();
-                    chatbox.update(false); // Update UI.
+                    chatbox.update(false);
                     return;
                 }
                 const input = document.createElement('input');
@@ -69,7 +69,7 @@ export const avatarsPlugin = {
                         localStorage.setItem(`gptChat_${type}Avatar`, reader.result);
                         avatar.src = reader.result;
                         chatbox.chatlog.clearCache();
-                        chatbox.update(false); // Update UI.
+                        chatbox.update(false);
                     });
                     reader.addEventListener('error', () => {
                         log(1, 'avatarsPlugin: Failed to read file');

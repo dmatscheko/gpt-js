@@ -1,26 +1,44 @@
 'use strict';
 
 import { log } from '../utils.js';
-import { autoMcpEndpoint } from '../config.js';
 
-if (autoMcpEndpoint !== '' && (localStorage.getItem('gptChat_mcpServer') == null || localStorage.getItem('gptChat_mcpServer') == '')) {
-    localStorage.setItem('gptChat_mcpServer', autoMcpEndpoint);
-}
+let mcpUrl = null;
+let mcpSessionId = null;
 let cachedToolsSection = '';
-const mcpUrl = localStorage.getItem('gptChat_mcpServer');
-let mcpSessionId = mcpUrl ? localStorage.getItem(`gptChat_mcpSession_${mcpUrl}`) || null : null;
+
+(async () => {
+    try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+            const config = await response.json();
+            if (config.mcp_endpoint) {
+                if (localStorage.getItem('gptChat_mcpServer') == null || localStorage.getItem('gptChat_mcpServer') == '') {
+                    localStorage.setItem('gptChat_mcpServer', config.mcp_endpoint);
+                }
+                mcpUrl = config.mcp_endpoint;
+            }
+        }
+    } catch (error) {
+        log(2, 'mcpPlugin: Could not fetch /api/config', error);
+    }
+
+    if (!mcpUrl) return;
+    mcpSessionId = localStorage.getItem(`gptChat_mcpSession_${mcpUrl}`) || null;
+    if (!cachedToolsSection) {
+        log(4, 'mcpPlugin: Pre-fetching tools from MCP', mcpUrl);
+        mcpJsonRpc('tools/list').then(response => {
+            const toolsArray = Array.isArray(response.tools) ? response.tools : [];
+            cachedToolsSection = generateToolsSection(toolsArray);
+            log(3, 'mcpPlugin: Tools section cached successfully');
+        }).catch(error => {
+            log(1, 'mcpPlugin: Failed to pre-fetch tools', error);
+            cachedToolsSection = '';
+        });
+    }
+
+})();
+
 let isInitialized = false;
-if (mcpUrl && !cachedToolsSection) {
-    log(4, 'mcpPlugin: Pre-fetching tools from MCP', mcpUrl);
-    mcpJsonRpc('tools/list').then(response => {
-        const toolsArray = Array.isArray(response.tools) ? response.tools : [];
-        cachedToolsSection = generateToolsSection(toolsArray);
-        log(3, 'mcpPlugin: Tools section cached successfully');
-    }).catch(error => {
-        log(1, 'mcpPlugin: Failed to pre-fetch tools', error);
-        cachedToolsSection = '';
-    });
-}
 
 const toolsHeader = `
 
@@ -36,8 +54,6 @@ example_arg_value2
 </parameter>
 </dma:function_call>
 Do not escape any of the function call arguments. The arguments will be parsed as normal text. There is one exception: If you need to write </dma:function_call> or </parameter> as value inside a <parameter>, write it like <\/dma:function_call> or <\/parameter>.
-
-Do not use the attributes "tool_call_id" or "handled" in the <dma:function_call> tags, even if you read them in your own messages. These attributes are reserved and are added automatically to your messages by the system, to show which tool calls belong to which responses and which tool calls have already been processed.
 
 You can use multiple tools in parallel by calling them together.
 
@@ -78,7 +94,7 @@ export const mcpPlugin = {
             if (systemMessage && !systemMessage.value.content.includes('## Tools:')) {
                 systemMessage.value.content += toolsHeader + cachedToolsSection;
                 systemMessage.cache = null;
-                chatbox.update(true); // Update UI (and scroll).
+                chatbox.update();
             }
             return payload;
         },
@@ -86,23 +102,30 @@ export const mcpPlugin = {
         onMessageComplete: function (message, chatlog, chatbox) {
             log(5, 'mcpPlugin: onMessageComplete called for role', message.value?.role);
             if (!message.value || message.value.role !== 'assistant') return;
+            const lastMessage = chatlog.getLastMessage();
+            if (message !== lastMessage) return;
             const { toolCalls, positions } = parseFunctionCalls(message.value.content);
             if (toolCalls.length > 0) {
                 log(3, 'mcpPlugin: Found tool calls', toolCalls.length);
                 toolCalls.forEach((tc, index) => {
                     tc.id = `tool_${index + 1}_${Math.random().toString(36).substring(2, 7)}`;
                 });
-                // Add tool_call_id attributes (in reverse to avoid index shifts).
+                // Add/override tool_call_id attributes (in reverse to avoid index shifts).
                 let content = message.value.content;
                 for (let i = positions.length - 1; i >= 0; i--) {
                     const pos = positions[i];
                     const gtIndex = content.indexOf('>', pos.start);
+                    let startTag = content.slice(pos.start, gtIndex + 1);
+                    // Remove existing tool_call_id attributes
+                    startTag = startTag.replace(/\s+tool_call_id\s*=\s*["'][^"']*["']/g, '');
+                    // Insert new tool_call_id
                     const insert = ` tool_call_id="${toolCalls[i].id}"`;
-                    content = content.slice(0, gtIndex) + insert + content.slice(gtIndex);
+                    startTag = startTag.slice(0, -1) + insert + '>';
+                    content = content.slice(0, pos.start) + startTag + content.slice(gtIndex + 1);
                 }
                 message.value.content = content;
                 message.cache = null;
-                chatbox.update(false); // Update UI (no scroll)
+                chatbox.update(false);
                 // Execute all tool calls in parallel.
                 Promise.all(toolCalls.map(async (tc, index) => {
                     log(4, 'mcpPlugin: Executing tool', tc.name, 'with params', tc.params);
@@ -138,15 +161,6 @@ export const mcpPlugin = {
                     }
                 })).then(toolResults => {
                     log(4, 'mcpPlugin: Processing tool results', toolResults.length);
-                    // Add handled="true" to start tags.
-                    let content = message.value.content;
-                    for (let i = positions.length - 1; i >= 0; i--) {
-                        const pos = positions[i];
-                        const gtIndex = content.indexOf('>', pos.start);
-                        const insert = ' handled="true"';
-                        content = content.slice(0, gtIndex) + insert + content.slice(gtIndex);
-                    }
-                    message.value.content = content;
                     message.cache = null;
                     // Add tool results as XML-like tags in a single tool message.
                     let toolContents = '';
@@ -166,8 +180,8 @@ export const mcpPlugin = {
                     // Auto-continue by streaming new assistant response.
                     const controller = chatbox.store.get('controllerInstance');
                     chatlog.addMessage(null); // Add placeholder for new response.
-                    chatbox.update(); // Update UI (with scroll, as new messages added).
-                    controller.generateAIResponse({}, chatlog); // Generate continuation.
+                    chatbox.update();
+                    controller.generateAIResponse({}, chatlog);
                 });
             }
         },
@@ -252,10 +266,6 @@ function parseFunctionCalls(content) {
         }
         const functionCallNode = doc.querySelector('dma\\:function_call');
         if (functionCallNode) {
-            if (functionCallNode.getAttribute('handled') === 'true') {
-                log(4, 'mcpPlugin: Skipping already handled tool call');
-                continue;
-            }
             const name = functionCallNode.getAttribute('name');
             const params = {};
             functionCallNode.querySelectorAll('parameter').forEach(param => {

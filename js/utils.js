@@ -27,7 +27,6 @@ export function log(level, ...args) {
     if (DEBUG_LEVEL < level) return;
     const prefixes = ['', 'ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE', 'FULLTRACE'];
     const prefix = `[${prefixes[level]}]`;
-    // const consoles = [console.log, console.error, console.warn, console.info, console.log, console.trace];
     const consoles = [console.log, console.error, console.warn, console.info, console.log, console.log, console.log];
     consoles[level](prefix, ...args);
 }

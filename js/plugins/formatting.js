@@ -124,6 +124,8 @@ export const formattingPlugins = [
             // Plugin to add copy-to-clipboard badges to code blocks and tables.
             onRenderMessage: function (el, message, chatbox) {
                 log(5, 'formattingPlugins: clipbadge onRenderMessage called');
+                el.classList.add('hljs-nobg', 'hljs-message');
+                el.dataset.plaintext = encodeURIComponent(message.value.content.trim());
                 const tableToCSV = (table) => {
                     const separator = ';';
                     const rows = table.querySelectorAll('tr');
