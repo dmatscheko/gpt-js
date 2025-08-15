@@ -68,7 +68,7 @@ let isInitialized = false;
  * @type {string}
  */
 const toolsHeader = `
-
+--- MCP TOOLS ---
 ## Tools:
 
 You use tools via function calls to help you solve questions. Make sure to use the following format for function calls, including the <dma:function_call> and </dma:function_call> tags. Function call should follow the following XML-inspired format:
@@ -130,14 +130,27 @@ export const mcpPlugin = {
         beforeApiCall: function (payload, chatbox) {
             log(5, 'mcpPlugin: beforeApiCall called');
             const mcpUrl = localStorage.getItem('gptChat_mcpServer');
-            if (!mcpUrl || !cachedToolsSection) return;
-            log(3, 'mcpPlugin: Appending tools section to system prompt');
+
             const systemMessage = chatbox.chatlog.getFirstMessage();
-            if (systemMessage && !systemMessage.value.content.includes('## Tools:')) {
-                systemMessage.value.content += toolsHeader + cachedToolsSection;
+            if (!systemMessage) return payload;
+
+            // Always remove the old tools section first
+            let content = systemMessage.value.content;
+            const originalContent = content;
+            content = content.replace(/--- MCP TOOLS ---[\s\S]*?--- END MCP TOOLS ---\n?/g, '');
+
+            // If MCP is configured and we have tools, add the new section
+            if (mcpUrl && cachedToolsSection) {
+                log(3, 'mcpPlugin: Adding tools section to system prompt');
+                content += toolsHeader + cachedToolsSection + '--- END MCP TOOLS ---\n';
+            }
+
+            if (content !== originalContent) {
+                systemMessage.value.content = content;
                 systemMessage.cache = null;
                 chatbox.update();
             }
+
             return payload;
         },
         /**

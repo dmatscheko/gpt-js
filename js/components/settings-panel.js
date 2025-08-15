@@ -84,8 +84,7 @@ class SettingsPanel {
      */
     handleLogin() {
         log(4, 'SettingsPanel: handleLogin called');
-        const apiKeyEl = document.querySelector('[data-testid="api-key-input"]');
-        const apiKey = apiKeyEl.value.trim();
+        const apiKey = this.ui.apiKeyEl.value.trim();
         log(4, 'SettingsPanel: apiKeyEl.value is', apiKey);
         const endpoint = this.ui.endpointEl.value.trim();
         if (!endpoint) {

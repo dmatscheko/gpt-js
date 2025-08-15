@@ -209,3 +209,11 @@
     bottom: -6px;
     left: calc(50% - 6px);
 }
+
+.delete-connection-btn {
+    cursor: pointer;
+    font-size: 14px;
+}
+.delete-connection-btn:hover {
+    opacity: 0.7;
+}
