@@ -46,7 +46,7 @@ class ChatService {
         const title = 'New Chat';
         const chatlog = new Chatlog();
         chatlog.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
-        const newChat = { id, title, chatlog };
+        const newChat = { id, title, chatlog, agents: [], flow: {} };
         this.chats.push(newChat);
         this.store.set('chats', this.chats);
         this.switchChat(id);
@@ -120,7 +120,9 @@ class ChatService {
         const serializedChats = this.chats.map(c => ({
             id: c.id,
             title: c.title,
-            data: c.chatlog.toJSON()
+            data: c.chatlog.toJSON(),
+            agents: c.agents,
+            flow: c.flow
         }));
         localStorage.setItem('gptChat_chats', JSON.stringify(serializedChats));
         localStorage.setItem('gptChat_currentChatId', this.currentChatId);
@@ -147,7 +149,13 @@ class ChatService {
                     const sysMsg = chatlog.rootAlternatives.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
                     sysMsg.answerAlternatives = oldRoot;
                 }
-                return { id: chatData.id, title: chatData.title, chatlog };
+                return {
+                    id: chatData.id,
+                    title: chatData.title,
+                    chatlog,
+                    agents: chatData.agents || [],
+                    flow: chatData.flow || {}
+                };
             });
         } else {
             const oldChatlog = localStorage.getItem('gptChat_chatlog');

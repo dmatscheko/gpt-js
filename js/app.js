@@ -21,6 +21,7 @@ import { avatarsPlugin } from './plugins/avatars.js';
 import { mcpPlugin } from './plugins/mcp.js';
 import { errorBubblePlugin } from './plugins/error-bubble.js';
 import { statsPlugin } from './plugins/stats.js';
+import { agentsPlugin } from './plugins/agents.js';
 import { startMessage, messageSubmit, messageStop } from './config.js';
 
 /**
@@ -107,13 +108,14 @@ class App {
      * Registers all the plugins.
      */
     registerPlugins() {
-        registerPlugin(mcpPlugin);
-        formattingPlugins.forEach(registerPlugin);
-        registerPlugin(alternativeNavigationPlugin);
-        registerPlugin(messageModificationPlugin);
-        registerPlugin(avatarsPlugin);
-        registerPlugin(errorBubblePlugin);
-        registerPlugin(statsPlugin);
+        registerPlugin(mcpPlugin, this);
+        formattingPlugins.forEach(plugin => registerPlugin(plugin, this));
+        registerPlugin(alternativeNavigationPlugin, this);
+        registerPlugin(messageModificationPlugin, this);
+        registerPlugin(avatarsPlugin, this);
+        registerPlugin(errorBubblePlugin, this);
+        registerPlugin(statsPlugin, this);
+        registerPlugin(agentsPlugin, this);
     }
 
     /**

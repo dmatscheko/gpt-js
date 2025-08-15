@@ -20,7 +20,10 @@ export const hooks = {
 
 window.hooks = hooks; // TODO: only for testing: remove
 
-export function registerPlugin(plugin) {
+export function registerPlugin(plugin, app) {
+    if (plugin.init) {
+        plugin.init(app);
+    }
     Object.entries(plugin.hooks || {}).forEach(([hookName, fn]) => {
         if (hooks[hookName]) {
             hooks[hookName].push(fn);
