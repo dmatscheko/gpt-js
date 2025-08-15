@@ -132,7 +132,7 @@ class ChatService {
             title: c.title,
             data: c.chatlog.toJSON(),
             agents: c.agents || [],
-            flow: c.flow || { steps: [] },
+            flow: c.flow || { steps: [], connections: [] },
         }));
         localStorage.setItem('gptChat_chats', JSON.stringify(serializedChats));
         localStorage.setItem('gptChat_currentChatId', this.currentChatId);
@@ -159,7 +159,9 @@ class ChatService {
                     const sysMsg = chatlog.rootAlternatives.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
                     sysMsg.answerAlternatives = oldRoot;
                 }
-                return { id: chatData.id, title: chatData.title, chatlog, agents: chatData.agents || [], flow: chatData.flow || { steps: [] } };
+                const flow = chatData.flow || { steps: [], connections: [] };
+                if (!flow.connections) flow.connections = [];
+                return { id: chatData.id, title: chatData.title, chatlog, agents: chatData.agents || [], flow };
             });
         } else {
             const oldChatlog = localStorage.getItem('gptChat_chatlog');
