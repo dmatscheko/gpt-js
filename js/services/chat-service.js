@@ -7,7 +7,7 @@
 import { Chatlog, Alternatives } from '../components/chatlog.js';
 import { firstPrompt } from '../config.js';
 import { log, triggerError } from '../utils/logger.js';
-import { getDatePrompt } from '../utils/chat.js';
+import { getDatePrompt, resetEditing } from '../utils/chat.js';
 
 /**
  * @class ChatService
@@ -60,6 +60,9 @@ class ChatService {
     switchChat(id) {
         log(3, 'ChatService: switchChat called for id', id);
         if (this.currentChatId === id) return;
+
+        const ui = this.store.get('ui');
+        resetEditing(this.store, ui.chatBox.chatlog, ui.chatBox);
 
         this.persistChats();
         this.currentChatId = id;

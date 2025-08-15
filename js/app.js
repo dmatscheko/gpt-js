@@ -243,9 +243,6 @@ class App {
             }
             if (height > this.clientHeight) this.style.height = `${height}px`;
         });
-        this.ui.messageEl.addEventListener('blur', () => {
-            resetEditing(this.store, this.ui.chatBox.chatlog, this.ui.chatBox);
-        });
         document.addEventListener('keydown', event => {
             if (event.key === 'Escape') {
                 this.store.get('controller').abort();
