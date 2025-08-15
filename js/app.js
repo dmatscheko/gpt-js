@@ -20,6 +20,7 @@ import { alternativeNavigationPlugin, messageModificationPlugin } from './plugin
 import { avatarsPlugin } from './plugins/avatars.js';
 import { mcpPlugin } from './plugins/mcp.js';
 import { errorBubblePlugin } from './plugins/error-bubble.js';
+import agentsPlugin from './plugins/agents.js';
 import { startMessage, messageSubmit, messageStop } from './config.js';
 
 /**
@@ -112,6 +113,7 @@ class App {
         registerPlugin(messageModificationPlugin);
         registerPlugin(avatarsPlugin);
         registerPlugin(errorBubblePlugin);
+        registerPlugin(agentsPlugin);
     }
 
     /**

@@ -47,9 +47,18 @@
                 </div>
             </div>
             <div id="chatArea" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                <div id="chatContainer">
-                    <div id="chat"></div>
+                <div id="chatAreaTabs">
+                    <button class="tab-button active" data-tab="chatTab">Chat</button>
+                    <button class="tab-button" data-tab="agentsTab">Agents</button>
+                    <button class="tab-button" data-tab="flowTab">Flow</button>
                 </div>
+                <div id="chatTab" class="tab-content active">
+                    <div id="chatContainer">
+                        <div id="chat"></div>
+                    </div>
+                </div>
+                <div id="agentsTab" class="tab-content"></div>
+                <div id="flowTab" class="tab-content"></div>
                 <div id="inputContainer">
                     <textarea id="messageInput" autofocus
                         placeholder="Enter multiline message and press &lt;shift&gt;+&lt;enter&gt;, or &lt;ctrl&gt;+&lt;enter&gt;, or click the triangle button."
