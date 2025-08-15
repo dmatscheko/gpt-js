@@ -20,6 +20,7 @@ import { alternativeNavigationPlugin, messageModificationPlugin } from './plugin
 import { avatarsPlugin } from './plugins/avatars.js';
 import { mcpPlugin } from './plugins/mcp.js';
 import { errorBubblePlugin } from './plugins/error-bubble.js';
+import { agentsPlugin } from './plugins/agents.js';
 import { startMessage, messageSubmit, messageStop } from './config.js';
 
 /**
@@ -85,6 +86,7 @@ class App {
     async init() {
         log(3, 'App: init called');
         this.registerPlugins();
+        agentsPlugin.init(this);
         this.setupGlobalErrorHandlers();
 
         this.ui.chatBox.onUpdate = () => this.chatService.persistChats();
@@ -106,6 +108,7 @@ class App {
      * Registers all the plugins.
      */
     registerPlugins() {
+        registerPlugin(agentsPlugin);
         registerPlugin(mcpPlugin);
         formattingPlugins.forEach(registerPlugin);
         registerPlugin(alternativeNavigationPlugin);

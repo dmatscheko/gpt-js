@@ -34,6 +34,16 @@ class ChatService {
         } else {
             this.switchChat(initialId);
         }
+
+        this.store.subscribe('currentChat', (chat) => {
+            if (chat) {
+                const index = this.chats.findIndex(c => c.id === chat.id);
+                if (index !== -1) {
+                    this.chats[index] = chat;
+                    this.persistChats();
+                }
+            }
+        });
     }
 
     /**
@@ -120,7 +130,9 @@ class ChatService {
         const serializedChats = this.chats.map(c => ({
             id: c.id,
             title: c.title,
-            data: c.chatlog.toJSON()
+            data: c.chatlog.toJSON(),
+            agents: c.agents || [],
+            flow: c.flow || { steps: [] },
         }));
         localStorage.setItem('gptChat_chats', JSON.stringify(serializedChats));
         localStorage.setItem('gptChat_currentChatId', this.currentChatId);
@@ -147,7 +159,7 @@ class ChatService {
                     const sysMsg = chatlog.rootAlternatives.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
                     sysMsg.answerAlternatives = oldRoot;
                 }
-                return { id: chatData.id, title: chatData.title, chatlog };
+                return { id: chatData.id, title: chatData.title, chatlog, agents: chatData.agents || [], flow: chatData.flow || { steps: [] } };
             });
         } else {
             const oldChatlog = localStorage.getItem('gptChat_chatlog');

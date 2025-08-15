@@ -1,0 +1,126 @@
+/* Styles for the agents and flow tabs */
+
+#tabs {
+    display: flex;
+    border-bottom: 1px solid #ccc;
+}
+
+.tab-button {
+    padding: 10px 20px;
+    cursor: pointer;
+    border: none;
+    background-color: transparent;
+    border-bottom: 2px solid transparent;
+    font-size: 1em;
+}
+
+.tab-button.active {
+    border-bottom: 2px solid #007bff;
+    font-weight: bold;
+}
+
+.tab-pane {
+    display: none;
+    padding: 20px;
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.tab-pane.active {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+#chat-tab-pane {
+    padding: 0;
+}
+
+#tab-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Agents Tab Styles */
+#agents-toolbar {
+    margin-bottom: 20px;
+}
+
+#agent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.agent-card {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    background-color: #f9f9f9;
+}
+
+.agent-card.active {
+    border-color: #007bff;
+    background-color: #f0f8ff;
+}
+
+.agent-card h3 {
+    margin-top: 0;
+}
+
+.agent-card-buttons {
+    margin-top: 10px;
+}
+
+#agent-form-container {
+    margin-top: 20px;
+    border-top: 1px solid #ccc;
+    padding-top: 20px;
+}
+
+#agent-form label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+#agent-form input[type="text"],
+#agent-form textarea {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    border-radius: 3px;
+    border: 1px solid #ccc;
+}
+
+#agent-form-buttons {
+    margin-top: 10px;
+}
+
+/* Flow Tab Styles */
+#flow-toolbar {
+    margin-bottom: 20px;
+}
+
+.flow-step-card {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    margin-bottom: 10px;
+}
+
+.flow-step-card select,
+.flow-step-card textarea {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    margin-bottom: 10px;
+    border-radius: 3px;
+    border: 1px solid #ccc;
+}
+
+.flow-step-card-buttons {
+    margin-top: 10px;
+}
