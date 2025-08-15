@@ -201,10 +201,11 @@ class Chatlog {
 
     /**
      * Notifies all subscribers of a change.
+     * @param {boolean} [scroll=true] - Whether to scroll to the bottom.
      */
-    notify() {
+    notify(scroll = true) {
         log(5, 'Chatlog: notify called');
-        this.subscribers.forEach(cb => cb());
+        this.subscribers.forEach(cb => cb(scroll));
         hooks.onChatUpdated.forEach(fn => fn(this));
     }
 
@@ -512,7 +513,7 @@ class Chatlog {
             alternatives.prev();
         }
 
-        this.notify();
+        this.notify(false);
     }
 
     /**

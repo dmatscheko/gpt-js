@@ -1,5 +1,5 @@
 """
-This is an example of a simple MCP server that provides a tool to get the current date and time.
+This is an MCP server that provides a tool to get the current date and time.
 """
 
 from fastmcp import FastMCP

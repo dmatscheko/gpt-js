@@ -1,3 +1,7 @@
+"""
+This is an MCP server that provides a tool to get a web page.
+"""
+
 import urllib3
 from fastmcp import FastMCP
 import requests
