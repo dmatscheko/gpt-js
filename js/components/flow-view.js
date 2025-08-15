@@ -128,7 +128,7 @@ class FlowView {
             this.flow = { nodes: [], connections: [] };
         }
         const newNode = {
-            id: `node-${crypto.randomUUID()}`,
+            id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             x: 50,
             y: 50,
             text: '',

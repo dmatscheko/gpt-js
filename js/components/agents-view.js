@@ -97,7 +97,7 @@ class AgentsView {
             e.preventDefault();
             const formData = new FormData(form);
             const data = {
-                id: this.editingAgentId || crypto.randomUUID(),
+                id: this.editingAgentId || `agent-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 name: formData.get('name'),
                 description: formData.get('description'),
                 systemPrompt: formData.get('systemPrompt'),
