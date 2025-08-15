@@ -20,6 +20,7 @@ import { alternativeNavigationPlugin, messageModificationPlugin } from './plugin
 import { avatarsPlugin } from './plugins/avatars.js';
 import { mcpPlugin } from './plugins/mcp.js';
 import { errorBubblePlugin } from './plugins/error-bubble.js';
+import { statsPlugin } from './plugins/stats.js';
 import { startMessage, messageSubmit, messageStop } from './config.js';
 
 /**
@@ -112,6 +113,7 @@ class App {
         registerPlugin(messageModificationPlugin);
         registerPlugin(avatarsPlugin);
         registerPlugin(errorBubblePlugin);
+        registerPlugin(statsPlugin);
     }
 
     /**
@@ -289,6 +291,16 @@ class App {
             log(5, 'App: Toggle chat list clicked');
             const cl = document.getElementById('chatListContainer');
             cl.style.display = cl.style.display === 'block' ? 'none' : 'block';
+        });
+
+        document.getElementById('tabs').addEventListener('click', (event) => {
+            if (event.target.classList.contains('tab-button')) {
+                const tab = event.target.dataset.tab;
+                document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
+                event.target.classList.add('active');
+                document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+                document.getElementById(tab).classList.add('active');
+            }
         });
     }
 

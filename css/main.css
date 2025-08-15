@@ -533,3 +533,29 @@ a:hover {
 #error-bubble-close:hover {
     color: #eee;
 }
+
+#tabs {
+    display: flex;
+    border-bottom: 1px solid #ccc;
+}
+
+.tab-button {
+    padding: 10px 20px;
+    border: none;
+    background-color: #f0f0f0;
+    cursor: pointer;
+}
+
+.tab-button.active {
+    background-color: #ccc;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: flex; /* Changed from display: block */
+    flex-direction: column;
+    flex: 1;
+}

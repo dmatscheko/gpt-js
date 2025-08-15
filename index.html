@@ -47,20 +47,31 @@
                 </div>
             </div>
             <div id="chatArea" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                <div id="chatContainer">
-                    <div id="chat"></div>
+                <div id="tabs">
+                    <button class="tab-button active" data-tab="chat-tab">Chat</button>
+                    <button class="tab-button" data-tab="stats-tab">Stats</button>
                 </div>
-                <div id="inputContainer">
-                    <textarea id="messageInput" autofocus
-                        placeholder="Enter multiline message and press &lt;shift&gt;+&lt;enter&gt;, or &lt;ctrl&gt;+&lt;enter&gt;, or click the triangle button."
-                        rows="3"></textarea>
-                    <button id="submitButton" title="Submit message / Stop assistant" class="toolButton">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path
-                                d="M6 6.741c0-1.544 1.674-2.505 3.008-1.728l9.015 5.26c1.323.771 1.323 2.683 0 3.455l-9.015 5.258C7.674 19.764 6 18.803 6 17.26V6.741zM17.015 12L8 6.741V17.26L17.015 12z"
-                                fill="currentColor" />
-                        </svg>
-                    </button>
+                <div id="tab-content" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                    <div id="chat-tab" class="tab-pane active" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                        <div id="chatContainer">
+                            <div id="chat"></div>
+                        </div>
+                        <div id="inputContainer">
+                            <textarea id="messageInput" autofocus
+                                placeholder="Enter multiline message and press &lt;shift&gt;+&lt;enter&gt;, or &lt;ctrl&gt;+&lt;enter&gt;, or click the triangle button."
+                                rows="3"></textarea>
+                            <button id="submitButton" title="Submit message / Stop assistant" class="toolButton">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <path
+                                        d="M6 6.741c0-1.544 1.674-2.505 3.008-1.728l9.015 5.26c1.323.771 1.323 2.683 0 3.455l-9.015 5.258C7.674 19.764 6 18.803 6 17.26V6.741zM17.015 12L8 6.741V17.26L17.015 12z"
+                                        fill="currentColor" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="stats-tab" class="tab-pane">
+                    </div>
                 </div>
             </div>
         </div>
