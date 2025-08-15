@@ -10,8 +10,14 @@ function createAgentForm(agent = {}, onSave, onCancel) {
         <input type="text" id="agent-name" placeholder="Agent Name" value="${agent.name || ''}" required>
         <textarea id="agent-description" placeholder="Agent Description">${agent.description || ''}</textarea>
         <textarea id="agent-system-prompt" placeholder="System Prompt">${agent.systemPrompt || ''}</textarea>
-        <button id="save-agent-btn">Save</button>
-        <button id="cancel-agent-btn">Cancel</button>
+        <label style="display: block; margin-top: 10px;">
+            <input type="checkbox" id="agent-is-tool" ${agent.isTool ? 'checked' : ''}>
+            Available as a tool for other agents
+        </label>
+        <div style="margin-top: 10px;">
+            <button id="save-agent-btn">Save</button>
+            <button id="cancel-agent-btn">Cancel</button>
+        </div>
     `;
 
     form.querySelector('#save-agent-btn').addEventListener('click', () => {
@@ -20,6 +26,7 @@ function createAgentForm(agent = {}, onSave, onCancel) {
             name: form.querySelector('#agent-name').value,
             description: form.querySelector('#agent-description').value,
             systemPrompt: form.querySelector('#agent-system-prompt').value,
+            isTool: form.querySelector('#agent-is-tool').checked,
         };
         onSave(newAgentData);
     });
@@ -153,10 +160,13 @@ function renderConnections(flow, container) {
 class FlowExecutor {
     constructor(app) {
         this.app = app;
+        this.MAX_STEPS = 100;
     }
 
     async run(flow, agents) {
         console.log("Running flow...", flow);
+        this.stepCount = 0;
+
         const startNodes = this.findStartNodes(flow);
 
         if (startNodes.length === 0) {
@@ -178,6 +188,13 @@ class FlowExecutor {
     }
 
     async executeNode(node, flow, agents) {
+        this.stepCount++;
+        if (this.stepCount > this.MAX_STEPS) {
+            alert(`Flow execution stopped: Maximum step limit of ${this.MAX_STEPS} reached. This is a safety measure to prevent infinite loops.`);
+            this.app.store.set('receiving', false); // Ensure UI is unlocked
+            return;
+        }
+
         console.log(`Executing node: ${node.name}`);
         const agent = agents.find(a => a.id === node.agentId);
         if (!agent) {
@@ -187,12 +204,81 @@ class FlowExecutor {
             return;
         }
 
-        console.log(`Using agent: ${agent.name}`);
-        console.log(`Message: ${node.message}`);
+        const chatlog = this.app.chatService.getCurrentChatlog();
+        if (!chatlog) {
+            alert("Error: Could not find current chatlog.");
+            return;
+        }
 
-        alert(`Executing step: ${node.name}\nAgent: ${agent.name}\nMessage: ${node.message}`);
+        this.app.store.set('receiving', true);
 
-        // TODO: Actual execution logic here
+        // Add a user message to represent the flow step
+        chatlog.addMessage({ role: 'user', content: `--- Executing Flow Step: ${node.name} ---\n${node.message}` });
+
+        // Prepare the payload for the API call
+        const messages = chatlog.getActiveMessageValues();
+        // Create a temporary clone of messages to avoid modifying the original chatlog's system prompt permanently
+        const executionMessages = JSON.parse(JSON.stringify(messages));
+        executionMessages[0].content = agent.systemPrompt;
+
+        const payload = {
+            model: this.app.configService.getModel(),
+            messages: executionMessages,
+            stream: true,
+            temperature: Number(this.app.ui.temperatureEl.value),
+            top_p: Number(this.app.ui.topPEl.value),
+        };
+
+        // Add a placeholder for the assistant's response
+        const assistantMsg = chatlog.addMessage({ role: 'assistant', content: null });
+        chatlog.notify();
+
+        try {
+            const reader = await this.app.apiService.streamAPIResponse(
+                payload,
+                this.app.configService.getEndpoint(),
+                this.app.configService.getApiKey(),
+                this.app.store.get('controller').signal
+            );
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const valueStr = new TextDecoder().decode(value);
+                if (valueStr.startsWith('{')) {
+                    const data = JSON.parse(valueStr);
+                    if (data.error) throw new Error(data.error.message);
+                }
+                const chunks = valueStr.split('\n');
+                let delta = '';
+                chunks.forEach(chunk => {
+                    if (!chunk.startsWith('data: ')) return;
+                    chunk = chunk.substring(6);
+                    if (chunk === '' || chunk === '[DONE]') return;
+                    const data = JSON.parse(chunk);
+                    if (data.error) throw new Error(data.error.message);
+                    delta += data.choices[0].delta.content || '';
+                });
+                if (delta) {
+                    assistantMsg.appendContent(delta);
+                    chatlog.notify();
+                }
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error("Flow execution error:", error);
+                assistantMsg.setContent(`[Error during flow execution: ${error.message}]`);
+                chatlog.notify();
+            } else {
+                assistantMsg.appendContent('\n\n[Response aborted by user]');
+                assistantMsg.cache = null;
+                chatlog.notify();
+            }
+        } finally {
+            this.app.store.set('receiving', false);
+            this.app.chatService.persistChats();
+        }
 
         const nextNodes = this.findNextNodes(node, flow);
         for (const nextNode of nextNodes) {
@@ -499,7 +585,9 @@ export const agentsPlugin = {
                 return payload;
             }
 
-            const agentsAsTools = currentChat.agents.map(agent => ({
+            const agentsAsTools = currentChat.agents
+                .filter(agent => agent.isTool)
+                .map(agent => ({
                 name: agent.name.replace(/\s+/g, '_').toLowerCase(),
                 description: agent.description,
                 inputSchema: {
