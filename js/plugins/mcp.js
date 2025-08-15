@@ -124,19 +124,19 @@ export const mcpPlugin = {
         /**
          * Appends tool descriptions to the system prompt before API calls if MCP is configured.
          * @param {Object} payload - The API payload.
-         * @param {import('../components/chatbox.js').ChatBox} chatbox - The ChatBox instance.
+         * @param {import('../app.js').default} app - The main App instance.
          * @returns {Object} The modified payload.
          */
-        beforeApiCall: function (payload, chatbox) {
+        beforeApiCall: function (payload, app) {
             log(5, 'mcpPlugin: beforeApiCall called');
             const mcpUrl = localStorage.getItem('gptChat_mcpServer');
             if (!mcpUrl || !cachedToolsSection) return;
             log(3, 'mcpPlugin: Appending tools section to system prompt');
-            const systemMessage = chatbox.chatlog.getFirstMessage();
+            const systemMessage = app.ui.chatBox.chatlog.getFirstMessage();
             if (systemMessage && !systemMessage.value.content.includes('## Tools:')) {
                 systemMessage.value.content += toolsHeader + cachedToolsSection;
                 systemMessage.cache = null;
-                chatbox.update();
+                app.ui.chatBox.update();
             }
             return payload;
         },
@@ -145,9 +145,9 @@ export const mcpPlugin = {
          * adds tool outputs to chatlog, and auto-continues the assistant response.
          * @param {import('../components/chatlog.js').Message} message - The completed message.
          * @param {import('../components/chatlog.js').Chatlog} chatlog - The chatlog.
-         * @param {import('../components/chatbox.js').ChatBox} chatbox - The ChatBox instance.
+         * @param {import('../app.js').default} app - The main App instance.
          */
-        onMessageComplete: function (message, chatlog, chatbox) {
+        onMessageComplete: function (message, chatlog, app) {
             log(5, 'mcpPlugin: onMessageComplete called for role', message.value?.role);
             if (!message.value || message.value.role !== 'assistant') return;
             const lastMessage = chatlog.getLastMessage();
@@ -173,7 +173,7 @@ export const mcpPlugin = {
                 }
                 message.value.content = content;
                 message.cache = null;
-                chatbox.update(false);
+                app.ui.chatBox.update(false);
                 // Execute all tool calls in parallel.
                 Promise.all(toolCalls.map(async (tc, index) => {
                     log(4, 'mcpPlugin: Executing tool', tc.name, 'with params', tc.params);
@@ -227,8 +227,8 @@ export const mcpPlugin = {
                     }
                     // Auto-continue by streaming new assistant response.
                     chatlog.addMessage(null); // Add placeholder for new response.
-                    chatbox.update();
-                    hooks.onGenerateAIResponse.forEach(fn => fn({}, chatlog));
+                    app.ui.chatBox.update();
+                    app.generateAIResponse({}, chatlog);
                 });
             }
         },

@@ -26,7 +26,7 @@ class FlowView {
     }
 
     render(flow, agents) {
-        this.flow = flow || { nodes: [], connections: [] };
+        this.flow = (flow && flow.nodes && flow.connections) ? flow : { nodes: [], connections: [] };
         this.agents = agents || [];
         this.container.innerHTML = `
             <div class="flow-view">
@@ -124,6 +124,9 @@ class FlowView {
     }
 
     addNode() {
+        if (!this.flow || !this.flow.nodes) {
+            this.flow = { nodes: [], connections: [] };
+        }
         const newNode = {
             id: `node-${crypto.randomUUID()}`,
             x: 50,

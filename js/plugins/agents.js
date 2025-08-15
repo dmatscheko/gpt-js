@@ -151,6 +151,13 @@ const agentsPlugin = {
                     flowView.render(chat.flow, chat.agents);
                 }
             });
+
+            // Initial render
+            const currentChat = store.get('currentChat');
+            if (currentChat) {
+                agentsView.render(currentChat.agents);
+                flowView.render(currentChat.flow, currentChat.agents);
+            }
         },
         onModifySystemPrompt: (systemContent, app) => {
             const toolAgents = getToolAgents(app);
