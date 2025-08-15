@@ -388,8 +388,6 @@ const agentsPlugin = {
             this.runFlow();
         });
 
-        this.renderAgents();
-        this.renderFlow();
     },
 
     hooks: {
