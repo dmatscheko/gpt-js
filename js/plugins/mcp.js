@@ -1,9 +1,28 @@
+/**
+ * @fileoverview Plugin for MCP (Model Context Protocol) integration.
+ */
+
 'use strict';
 
-import { log } from '../utils.js';
+import { log } from '../utils/logger.js';
+import { hooks } from '../hooks.js';
 
+/**
+ * The MCP server URL.
+ * @type {string|null}
+ */
 let mcpUrl = null;
+
+/**
+ * The MCP session ID.
+ * @type {string|null}
+ */
 let mcpSessionId = null;
+
+/**
+ * The cached tools section.
+ * @type {string}
+ */
 let cachedToolsSection = '';
 
 (async () => {
@@ -38,8 +57,16 @@ let cachedToolsSection = '';
 
 })();
 
+/**
+ * Whether the MCP session is initialized.
+ * @type {boolean}
+ */
 let isInitialized = false;
 
+/**
+ * The header for the tools section in the system prompt.
+ * @type {string}
+ */
 const toolsHeader = `
 
 ## Tools:
@@ -61,17 +88,28 @@ You can use multiple tools in parallel by calling them together.
 
 `;
 
-// Plugin for MCP (Model Context Protocol) integration, handling tools and citations.
+/**
+ * @typedef {import('../hooks.js').Plugin} Plugin
+ */
+
+/**
+ * Plugin for MCP (Model Context Protocol) integration, handling tools and citations.
+ * @type {Plugin}
+ */
 export const mcpPlugin = {
     name: 'mcp',
     hooks: {
-        // Renders a settings input for the MCP server URL.
+        /**
+         * Renders a settings input for the MCP server URL.
+         * @param {HTMLElement} settingsEl - The settings element.
+         */
         onSettingsRender: function (settingsEl) {
             log(5, 'mcpPlugin: onSettingsRender called');
             if (settingsEl.querySelector('#mcpServer')) return;
             const p = document.createElement('p');
             const label = document.createElement('label');
-            label.for = 'mcpServer';
+            label.style = 'margin-top: 16px; margin-bottom: 4px; margin-left: 4px; display: block;';
+            label.htmlFor = 'mcpServer';
             label.textContent = 'MCP Server URL';
             const input = document.createElement('input');
             input.type = 'text';
@@ -80,11 +118,15 @@ export const mcpPlugin = {
             input.value = localStorage.getItem('gptChat_mcpServer') || '';
             input.addEventListener('input', () => localStorage.setItem('gptChat_mcpServer', input.value));
             p.appendChild(label);
-            p.appendChild(document.createElement('br'));
             p.appendChild(input);
             settingsEl.appendChild(p);
         },
-        // Appends tool descriptions to the system prompt before API calls if MCP is configured.
+        /**
+         * Appends tool descriptions to the system prompt before API calls if MCP is configured.
+         * @param {Object} payload - The API payload.
+         * @param {import('../components/chatbox.js').ChatBox} chatbox - The ChatBox instance.
+         * @returns {Object} The modified payload.
+         */
         beforeApiCall: function (payload, chatbox) {
             log(5, 'mcpPlugin: beforeApiCall called');
             const mcpUrl = localStorage.getItem('gptChat_mcpServer');
@@ -98,7 +140,13 @@ export const mcpPlugin = {
             }
             return payload;
         },
-        // Processes completed assistant messages: parses tool calls, executes them via MCP, adds tool outputs to chatlog, and auto-continues the assistant response.
+        /**
+         * Processes completed assistant messages: parses tool calls, executes them via MCP,
+         * adds tool outputs to chatlog, and auto-continues the assistant response.
+         * @param {import('../components/chatlog.js').Message} message - The completed message.
+         * @param {import('../components/chatlog.js').Chatlog} chatlog - The chatlog.
+         * @param {import('../components/chatbox.js').ChatBox} chatbox - The ChatBox instance.
+         */
         onMessageComplete: function (message, chatlog, chatbox) {
             log(5, 'mcpPlugin: onMessageComplete called for role', message.value?.role);
             if (!message.value || message.value.role !== 'assistant') return;
@@ -178,14 +226,17 @@ export const mcpPlugin = {
                         chatlog.addMessage({ role: 'tool', content: toolContents });
                     }
                     // Auto-continue by streaming new assistant response.
-                    const controller = chatbox.store.get('controllerInstance');
                     chatlog.addMessage(null); // Add placeholder for new response.
                     chatbox.update();
-                    controller.generateAIResponse({}, chatlog);
+                    hooks.onGenerateAIResponse.forEach(fn => fn({}, chatlog));
                 });
             }
         },
-        // Replaces citation XML tags with HTML superscript links.
+        /**
+         * Replaces citation XML tags with HTML superscript links.
+         * @param {HTMLElement} wrapper - The wrapper element containing the content.
+         * @param {import('../components/chatlog.js').Message} message - The message object.
+         */
         onPostFormatContent: function (wrapper, message) {
             log(5, 'mcpPlugin: onPostFormatContent called');
             wrapper.querySelectorAll('dma\\:render[type="render_inline_citation"]').forEach(node => {
@@ -215,7 +266,11 @@ export const mcpPlugin = {
     }
 };
 
-// Function to generate the tools Markdown section from a list of tools.
+/**
+ * Generates the tools Markdown section from a list of tools.
+ * @param {Object[]} tools - The list of tools.
+ * @returns {string} The Markdown section.
+ */
 function generateToolsSection(tools) {
     const sections = [];
     tools.forEach((tool, idx) => {
@@ -238,7 +293,11 @@ function generateToolsSection(tools) {
     return sections.join('\n');
 }
 
-// Parser for <dma:function_call> tags that extracts tool calls without full-content XML parsing.
+/**
+ * Parses <dma:function_call> tags and extracts tool calls.
+ * @param {string} content - The content to parse.
+ * @returns {{toolCalls: Object[], positions: Object[]}} The parsed tool calls and their positions.
+ */
 function parseFunctionCalls(content) {
     log(5, 'mcpPlugin: parseFunctionCalls called');
     const toolCalls = [];
@@ -282,7 +341,9 @@ function parseFunctionCalls(content) {
     return { toolCalls, positions };
 }
 
-// Initializes the MCP session per spec if not already done.
+/**
+ * Initializes the MCP session.
+ */
 async function initMcpSession() {
     if (isInitialized) return;
     log(4, 'mcpPlugin: Initializing MCP session');
@@ -313,7 +374,14 @@ async function initMcpSession() {
     log(4, 'mcpPlugin: MCP session initialized', mcpSessionId);
 }
 
-// Core function to send JSON-RPC requests, handling SSE/JSON and timeouts.
+/**
+ * Sends a JSON-RPC request to the MCP server.
+ * @param {string} method - The JSON-RPC method.
+ * @param {Object} [params={}] - The JSON-RPC parameters.
+ * @param {boolean} [isInit=false] - Whether this is an initialization request.
+ * @param {boolean} [isNotification=false] - Whether this is a notification.
+ * @returns {Promise<Object|null>} The JSON-RPC result.
+ */
 async function sendMcpRequest(method, params = {}, isInit = false, isNotification = false) {
     const url = localStorage.getItem('gptChat_mcpServer');
     if (!url) throw new Error('No MCP server URL set');
@@ -407,7 +475,13 @@ async function sendMcpRequest(method, params = {}, isInit = false, isNotificatio
     }
 }
 
-// Performs JSON-RPC calls to the MCP server for operational methods.
+/**
+ * Performs a JSON-RPC call to the MCP server.
+ * @param {string} method - The JSON-RPC method.
+ * @param {Object} [params={}] - The JSON-RPC parameters.
+ * @param {boolean} [retry=false] - Whether to retry on session errors.
+ * @returns {Promise<Object>} The JSON-RPC result.
+ */
 async function mcpJsonRpc(method, params = {}, retry = false) {
     log(5, 'mcpPlugin: mcpJsonRpc called with method', method, 'params', params);
     try {
@@ -434,7 +508,11 @@ async function mcpJsonRpc(method, params = {}, retry = false) {
     }
 }
 
-// Escape XML special characters for safe insertion into tags.
+/**
+ * Escapes XML special characters.
+ * @param {string} unsafe - The string to escape.
+ * @returns {string} The escaped string.
+ */
 function escapeXml(unsafe) {
     return unsafe.replace(/[<>&'"]/g, function (c) {
         switch (c) {

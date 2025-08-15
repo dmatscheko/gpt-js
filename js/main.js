@@ -1,8 +1,12 @@
+/**
+ * @fileoverview Main entry point for the application.
+ */
+
 'use strict';
 
-import Controller from './controller.js';
+import App from './app.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const controller = new Controller();
-    await controller.init();
+    const app = new App();
+    await app.init();
 });

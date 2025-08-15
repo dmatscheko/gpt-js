@@ -1,13 +1,43 @@
+/**
+ * @fileoverview A plugin for displaying error messages in a bubble UI element.
+ */
+
 'use strict';
 
-import { log } from '../utils.js';
+import { log } from '../utils/logger.js';
 
+/**
+ * The timeout ID for the error bubble.
+ * @type {number|null}
+ */
 let timeoutId = null;
 
-// Plugin for displaying error messages in a bubble UI element.
+/**
+ * Hides the error bubble.
+ */
+function hideBubble() {
+    log(5, 'errorBubblePlugin: Hiding error bubble');
+    const bubble = document.getElementById('error-bubble');
+    if (!bubble) return;
+    bubble.classList.add('hiding');
+    bubble.addEventListener('animationend', () => {
+        bubble.style.display = 'none';
+        bubble.classList.remove('hiding');
+        document.getElementById('error-bubble-content').innerHTML = '';
+    }, { once: true }); // One-time listener.
+}
+
+/**
+ * Plugin for displaying error messages in a bubble UI element.
+ * @type {import('../hooks.js').Plugin}
+ */
 export const errorBubblePlugin = {
     name: 'error-bubble',
     hooks: {
+        /**
+         * Displays an error message in the error bubble.
+         * @param {...*} args - The error arguments to display.
+         */
         onError: function (...args) {
             log(5, 'errorBubblePlugin: onError called with args', args);
             if (args.length === 0) {
@@ -55,15 +85,4 @@ export const errorBubblePlugin = {
     }
 };
 
-function hideBubble() {
-    log(5, 'errorBubblePlugin: Hiding error bubble');
-    const bubble = document.getElementById('error-bubble');
-    if (!bubble) return;
-    bubble.classList.add('hiding');
-    bubble.addEventListener('animationend', () => {
-        bubble.style.display = 'none';
-        bubble.classList.remove('hiding');
-        document.getElementById('error-bubble-content').innerHTML = '';
-    }, { once: true }); // One-time listener.
-}
 document.getElementById('error-bubble-close').addEventListener('click', hideBubble);

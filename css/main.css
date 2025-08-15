@@ -2,6 +2,7 @@
 :root {
     --bg-color: #202122;
     --text-color: #efeff0;
+    --text-color-hover: #fafafb;
     --accent-bg: #343542;
     --accent-bg-hover: #40424f;
     --border-color: #20212280;
@@ -21,8 +22,10 @@
     --table-th-bg: #ececf033;
     --table-text: #d1d5db;
     --hljs-bg: #282b2e60;
-    --tool-button-bg: #40424f;
-    --tool-button-small-bg: #40424f60;
+    --tool-button-bg: #ffffff10;
+    --tool-button-bg-hover: #ffffff30;
+    --tool-button-small-bg: #ffffff10;
+    --tool-button-small-bg-hover: #ffffff30;
     --settings-bg: #343542dd;
     --input-bg: #40424f;
     --input-border: #20212280;
@@ -182,13 +185,20 @@ html, body {
     height: 29px;
     cursor: pointer;
 }
+.toolButton:hover {
+    background-color: var(--tool-button-bg-hover);
+    color: var(--text-color-hover);
+}
 .toolButton.small {
     background-color: var(--tool-button-small-bg);
-    border-radius: 4px;
     padding: 0;
     margin: 0;
     width: 26px;
-    height: 16px;
+    height: 18px;
+}
+.toolButton.small:hover {
+    background-color: var(--tool-button-small-bg-hover);
+    color: var(--text-color-hover);
 }
 
 /* Source link positioning */

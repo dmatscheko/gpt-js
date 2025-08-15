@@ -1,6 +1,13 @@
+/**
+ * @fileoverview Configuration constants for the application.
+ */
+
 'use strict';
 
-// The initial system prompt defining AI behavior and capabilities.
+/**
+ * The initial system prompt defining AI behavior and capabilities.
+ * @type {string}
+ */
 export const firstPrompt = `You have the ability to present perspectives and provide real-time date and time information.
 You can create and understand visuals, such as images, graphs, and charts, using SVG technology.
 Unless otherwise specified by the user, always use SVG for drawings.
@@ -17,13 +24,33 @@ Always apply thoughtful consideration in all tasks.
 Your responses are backed by your extensive knowledge in programming and science.
 Be clear in articulating any ambiguities to ensure effective communication.`;
 
-// Initial message displayed in new chats.
+/**
+ * The initial message displayed in new chats.
+ * @type {string}
+ */
 export const startMessage = '';
 
-// SVG icons for submit and stop buttons.
+/**
+ * SVG icon for the submit button.
+ * @type {string}
+ */
 export const messageSubmit = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6.741c0-1.544 1.674-2.505 3.008-1.728l9.015 5.26c1.323.771 1.323 2.683 0 3.455l-9.015 5.258C7.674 19.764 6 18.803 6 17.26V6.741zM17.015 12L8 6.741V17.26L17.015 12z" fill="currentColor"/></svg>';
+
+/**
+ * SVG icon for the stop button.
+ * @type {string}
+ */
 export const messageStop = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7zm12 0H7v10h10V7z" fill="currentColor"/></svg>';
 
+/**
+ * The default API endpoint.
+ * @type {string}
+ */
 export const defaultEndpoint = 'https://api.openai.com/v1/chat/completions';
 
-export const DEBUG_LEVEL = 5; // Debug level: 0: none, 1: errors, 2: warnings, 3: info, 4: debug, 5: trace, 6: full trace including partial AI messages
+/**
+ * The debug level for logging.
+ * 0: none, 1: errors, 2: warnings, 3: info, 4: debug, 5: trace, 6: full trace (includes partial AI messages during streaming)
+ * @type {number}
+ */
+export const DEBUG_LEVEL = 5;

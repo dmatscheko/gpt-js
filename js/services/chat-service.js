@@ -1,8 +1,13 @@
+/**
+ * @fileoverview Service for managing chat sessions.
+ */
+
 'use strict';
 
-import { Chatlog, Alternatives } from '../chatlog.js';
+import { Chatlog, Alternatives } from '../components/chatlog.js';
 import { firstPrompt } from '../config.js';
-import { log, triggerError, getDatePrompt } from '../utils.js';
+import { log, triggerError } from '../utils/logger.js';
+import { getDatePrompt } from '../utils/chat.js';
 
 /**
  * @class ChatService
@@ -10,7 +15,7 @@ import { log, triggerError, getDatePrompt } from '../utils.js';
  */
 class ChatService {
     /**
-     * @param {import('../store.js').default} store - The application's state store.
+     * @param {import('../state/store.js').default} store - The application's state store.
      */
     constructor(store) {
         this.store = store;

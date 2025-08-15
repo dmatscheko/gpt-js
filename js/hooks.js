@@ -10,11 +10,12 @@ export const hooks = {
     onFormatContent: [], // Called during content formatting (e.g., for Markdown, etc.). Args: (text) => html.
     onPostFormatContent: [], // Called after content is formatted into a wrapper element. Args: (wrapperEl, messageObj).
     onRenderMessage: [], // Called when rendering a message element, allows modifying the DOM element. Args: (el, message).
-    onRenderMessageControls: [], // Called to add controls (buttons) to a message element. Args: (containerEl, message, chatlog).
+    onRenderMessageControls: [], // Called to add controls (buttons) to a message element. Args: (containerEl, message, chatlog, chatbox).
     onSettingsRender: [], // Called when the settings panel is opened, allows adding elements to it. Args: (settingsEl).
     onModifySystemPrompt: [], // Called to modify the system prompt before API call. Args: (systemContent) => modifiedSystemContent.
     onStateChange: [], // Called on central state changes (e.g., receiving, apiKey). Args: (key, value).
-    onChatUpdated: [] // Called when chatlog updates. Args: (chatlog).
+    onChatUpdated: [], // Called when chatlog updates. Args: (chatlog).
+    onGenerateAIResponse: [], // Called to request an AI response. Args: (options, chatlog).
 };
 
 window.hooks = hooks; // TODO: only for testing: remove

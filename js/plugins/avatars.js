@@ -1,15 +1,26 @@
+/**
+ * @fileoverview A plugin for handling user and assistant avatars.
+ */
+
 'use strict';
 
-import { triggerError } from '../utils.js';
-import { log } from '../utils.js';
+import { triggerError, log } from '../utils/logger.js';
 
-// Default SVG avatars for user (ping) and assistant (pong).
+/**
+ * Default SVG avatar for the user.
+ * @type {string}
+ */
 const avatarPing = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
 <circle cx="40" cy="40" r="40" fill="#FFC107" />
 <circle cx="25" cy="30" r="5" fill="white" />
 <circle cx="55" cy="30" r="5" fill="white" />
 <path d="M 25 55 Q 40 65, 55 55" fill="none" stroke="white" stroke-width="4" />
 </svg>`;
+
+/**
+ * Default SVG avatar for the assistant.
+ * @type {string}
+ */
 const avatarPong = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
 <rect x="2" y="2" width="76" height="76" fill="#2196F3" />
 <circle cx="25" cy="30" r="5" fill="white" />
@@ -18,10 +29,24 @@ const avatarPong = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" 
 <rect x="25" y="60" width="30" height="5" fill="#ffffff" />
 </svg>`;
 
-// Plugin for handling avatars, allowing custom uploads via localStorage.
+/**
+ * @typedef {import('../components/chatbox.js').ChatBox} ChatBox
+ * @typedef {import('../components/chatlog.js').Message} Message
+ */
+
+/**
+ * Plugin for handling avatars, allowing custom uploads via localStorage.
+ * @type {import('../hooks.js').Plugin}
+ */
 export const avatarsPlugin = {
     name: 'avatars',
     hooks: {
+        /**
+         * Renders the avatar for a message.
+         * @param {HTMLElement} el - The message element.
+         * @param {Message} message - The message object.
+         * @param {ChatBox} chatbox - The ChatBox instance.
+         */
         onRenderMessage: function (el, message, chatbox) {
             log(4, 'avatarsPlugin: Rendering avatar for role', message.value.role);
             let type = 'ping'; // Default to user avatar type.

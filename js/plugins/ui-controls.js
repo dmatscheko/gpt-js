@@ -1,32 +1,33 @@
+/**
+ * @fileoverview A plugin for adding UI controls to messages.
+ */
+
 'use strict';
 
-import { triggerError, log, resetEditing } from '../utils.js';
+import { triggerError, log } from '../utils/logger.js';
+import { createControlButton } from '../utils/ui.js';
+import { resetEditing } from '../utils/chat.js';
+import { hooks } from '../hooks.js';
 
 /**
- * Helper function to create a tool button.
- * @param {string} title - The button's title (tooltip).
- * @param {string} svgHtml - The SVG icon for the button.
- * @param {function} onClick - The click event handler.
- * @returns {HTMLButtonElement} The created button element.
+ * @typedef {import('../components/chatbox.js').ChatBox} ChatBox
+ * @typedef {import('../components/chatlog.js').Chatlog} Chatlog
+ * @typedef {import('../components/chatlog.js').Message} Message
  */
-function createControlButton(title, svgHtml, onClick) {
-    const button = document.createElement('button');
-    button.title = title;
-    button.classList.add('toolButton', 'small');
-    button.innerHTML = svgHtml;
-    button.addEventListener('click', (e) => {
-        e.stopPropagation();
-        onClick(e);
-    });
-    return button;
-}
 
 /**
  * Plugin to add navigation controls for alternative messages.
+ * @type {import('../hooks.js').Plugin}
  */
 export const alternativeNavigationPlugin = {
     name: 'alternativeNavigation',
     hooks: {
+        /**
+         * Renders navigation controls for alternative messages.
+         * @param {HTMLElement} container - The container for the controls.
+         * @param {Message} message - The message object.
+         * @param {Chatlog} chatlog - The chatlog instance.
+         */
         onRenderMessageControls: function(container, message, chatlog) {
             const alternatives = chatlog.findAlternativesForMessage(message);
             if (!alternatives || alternatives.messages.length <= 1) return;
@@ -59,20 +60,28 @@ export const alternativeNavigationPlugin = {
 
 /**
  * Plugin to add message modification controls (add, edit, delete).
+ * @type {import('../hooks.js').Plugin}
  */
 export const messageModificationPlugin = {
     name: 'messageModification',
     hooks: {
+        /**
+         * Renders modification controls for a message.
+         * @param {HTMLElement} container - The container for the controls.
+         * @param {Message} message - The message object.
+         * @param {Chatlog} chatlog - The chatlog instance.
+         * @param {ChatBox} chatbox - The ChatBox instance.
+         */
         onRenderMessageControls: function(container, message, chatlog, chatbox) {
             const store = chatbox.store;
+            const ui = store.get('ui');
+            const messageInput = ui.messageEl;
 
             const addBtn = createControlButton(
                 'New Message',
-                '<svg width="16" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1z" fill="currentColor"/></svg>',
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2h-6v6a1 1 0 1 1-2 0v-6H5a1 1 0 1 1 0-2h6V5a1 1 0 0 1 1-1z" fill="currentColor"/></svg>',
                 () => {
                     log(4, 'Add button clicked for message', message);
-                    const controller = store.get('controllerInstance');
-                    const messageInput = controller.ui.messageEl;
                     if (messageInput.value !== '' && messageInput.value !== message.value.content.trim()) {
                         triggerError("Chat input is not empty.");
                         return;
@@ -81,7 +90,7 @@ export const messageModificationPlugin = {
                     if (message.value.role === 'assistant') {
                         // Regenerate AI message
                         chatlog.addAlternative(message, { role: message.value.role, content: null });
-                        controller.generateAIResponse({}, chatlog);
+                        hooks.onGenerateAIResponse.forEach(fn => fn({}, chatlog));
                     } else {
                         // Add a new editable alternative for user/system/tool messages with placeholder
                         const pos = chatlog.getMessagePos(message);
@@ -102,8 +111,6 @@ export const messageModificationPlugin = {
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg>',
                 () => {
                     log(4, 'Edit button clicked for message', message);
-                    const controller = store.get('controllerInstance');
-                    const messageInput = controller.ui.messageEl;
                     if (messageInput.value !== '' && messageInput.value !== message.value.content.trim()) {
                         triggerError("Chat input is not empty.");
                         return;

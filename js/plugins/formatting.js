@@ -1,14 +1,29 @@
+/**
+ * @fileoverview A collection of plugins for formatting message content.
+ */
+
 'use strict';
 
-import { triggerError } from '../utils.js';
-import { log } from '../utils.js';
+import { triggerError, log } from '../utils/logger.js';
 
-// Each plugin applies transformations like SVG normalization, thinking tags, Markdown, KaTeX, and clip badges.
+/**
+ * @typedef {import('../hooks.js').Plugin} Plugin
+ */
+
+/**
+ * A collection of plugins for formatting message content.
+ * Each plugin applies transformations like SVG normalization, thinking tags, Markdown, KaTeX, and clip badges.
+ * @type {Plugin[]}
+ */
 export const formattingPlugins = [
     {
         name: 'svg_normalization',
         hooks: {
-            // Plugin to normalize SVG. Wraps SVGs in code blocks and fixes data URIs.
+            /**
+             * Normalizes SVG content. Wraps SVGs in code blocks and fixes data URIs.
+             * @param {string} text - The text content to format.
+             * @returns {string} The formatted text.
+             */
             onFormatContent: function (text) {
                 log(5, 'formattingPlugins: svg_normalization onFormatContent called');
                 text = text.replace(/((?:```\w*?\s*?)|(?:<render_component[^>]*?>\s*?)|)(<svg[^>]*?>)([\s\S]*?)(<\/svg>(?:\s*?```|\s*?<\/render_component>|)|$)/gi,
@@ -35,7 +50,11 @@ export const formattingPlugins = [
     {
         name: 'think',
         hooks: {
-            // Plugin to handle <think> tags. Converts them to collapsible HTML details elements.
+            /**
+             * Handles <think> tags. Converts them to collapsible HTML details elements.
+             * @param {string} text - The text content to format.
+             * @returns {string} The formatted text.
+             */
             onFormatContent: function (text) {
                 log(5, 'formattingPlugins: think onFormatContent called');
                 text = text.replace(/<think>([\s\S]*?)<\/think>/g, '<details class="think"><summary>Thinking</summary><div class="think-content">$1</div></details>');
@@ -48,7 +67,11 @@ export const formattingPlugins = [
     {
         name: 'markdown',
         hooks: {
-            // Plugin for Markdown rendering using markdown-it and syntax highlighting with highlight.js.
+            /**
+             * Renders Markdown using markdown-it and syntax highlighting with highlight.js.
+             * @param {string} text - The text content to format.
+             * @returns {string} The formatted text.
+             */
             onFormatContent: function (text) {
                 log(5, 'formattingPlugins: markdown onFormatContent called');
                 const mdSettings = {
@@ -85,7 +108,10 @@ export const formattingPlugins = [
     {
         name: 'katex',
         hooks: {
-            // Plugin for rendering LaTeX math with KaTeX.
+            /**
+             * Renders LaTeX math with KaTeX.
+             * @param {HTMLElement} wrapper - The wrapper element containing the content.
+             */
             onPostFormatContent: function (wrapper) {
                 log(5, 'formattingPlugins: katex onPostFormatContent called');
                 const origFormulas = [];
@@ -121,8 +147,12 @@ export const formattingPlugins = [
     {
         name: 'clipbadge',
         hooks: {
-            // Plugin to add copy-to-clipboard badges to code blocks and tables.
-            onRenderMessage: function (el, message, chatbox) {
+            /**
+             * Adds copy-to-clipboard badges to code blocks and tables.
+             * @param {HTMLElement} el - The message element.
+             * @param {import('../components/chatlog.js').Message} message - The message object.
+             */
+            onRenderMessage: function (el, message) {
                 log(5, 'formattingPlugins: clipbadge onRenderMessage called');
                 el.classList.add('hljs-nobg', 'hljs-message');
                 el.dataset.plaintext = encodeURIComponent(message.value.content.trim());
@@ -150,30 +180,34 @@ export const formattingPlugins = [
     }
 ];
 
-// Provides copy-to-clipboard badges for code blocks and tables.
-
-// It is a heavily modified version of this:
-// https://unpkg.com/highlightjs-badge@0.1.9/highlightjs-badge.js
-
-// Use like this:
-//
-// const cb = new ClipBadge({
-//   templateSelector: '#my-badge-template',
-//   contentSelector: '#my-clip-snippets',
-//   autoRun: true,
-//   copyIconClass: 'fa fa-copy',
-//   copyIconContent: ' Copy',
-//   checkIconClass: 'fa fa-check text-success',
-//   checkIconContent: ' Copied!',
-//   onBeforeCodeCopied: (text, code) => {
-//     // Modify the text or code element before copying
-//     return text;
-//   },
-//   codeButtonContent: 'Code',
-//   imageButtonContent: 'Image'
-// });
-
+/**
+ * @class ClipBadge
+ * Provides copy-to-clipboard badges for code blocks and tables.
+ * It is a heavily modified version of this:
+ * https://unpkg.com/highlightjs-badge@0.1.9/highlightjs-badge.js
+ * 
+ * Use like this:
+ * 
+ * const cb = new ClipBadge({
+ *   templateSelector: '#my-badge-template',
+ *   contentSelector: '#my-clip-snippets',
+ *   autoRun: true,
+ *   copyIconClass: 'fa fa-copy',
+ *   copyIconContent: ' Copy',
+ *   checkIconClass: 'fa fa-check text-success',
+ *   checkIconContent: ' Copied!',
+ *   onBeforeCodeCopied: (text, code) => {
+ *     // Modify the text or code element before copying
+ *     return text;
+ *   },
+ *   codeButtonContent: 'Code',
+ *   imageButtonContent: 'Image'
+ * });
+ */
 class ClipBadge {
+    /**
+     * @param {Object} [options={}] - The options for the clip badge.
+     */
     constructor(options = {}) {
         this.settings = { ...this.defaults, ...options };
         log(5, 'ClipBadge: Constructor called with options', options);
@@ -183,7 +217,7 @@ class ClipBadge {
             this.init();
         }
     }
-    // Default settings.
+
     defaults = {
         templateSelector: '#clip-badge-template',
         contentSelector: 'body',
@@ -197,15 +231,60 @@ class ClipBadge {
         imageButtonContent: 'Image'
     };
 
-    // Adds a copy badge to a highlighted element.
+    /**
+     * Initializes the ClipBadge by appending styles and template.
+     */
+    init() {
+        log(4, 'ClipBadge: init called');
+        const node = this.getTemplate();
+        document.head.appendChild(node.content.querySelector('style').cloneNode(true));
+        this.settings.template = node.content.querySelector('.clip-badge').cloneNode(true);
+        if (this.settings.autoRun) this.addAll();
+    }
+
+    /**
+     * Adds badges to all highlighted elements in the content selector.
+     */
+    addAll() {
+        log(5, 'ClipBadge: addAll called');
+        const content = document.querySelector(this.settings.contentSelector);
+        content.querySelectorAll('.hljs, .hljs-nobg').forEach(el => this.addBadge(el));
+    }
+
+    /**
+     * Adds badges to highlighted elements within a specific container.
+     * @param {HTMLElement} container - The container to add badges to.
+     */
+    addTo(container) {
+        log(5, 'ClipBadge: addTo called for container', container);
+        container.querySelectorAll('.hljs, .hljs-nobg').forEach(el => this.addBadge(el));
+        if (container.classList.contains('hljs') || container.classList.contains('hljs-nobg')) this.addBadge(container);
+    }
+
+    /**
+     * Adds a copy badge to a highlighted element.
+     * @param {HTMLElement} highlightEl - The element to add the badge to.
+     */
     addBadge(highlightEl) {
         log(5, 'ClipBadge: addBadge called for element', highlightEl);
         if (highlightEl.classList.contains('clip-badge-pre')) return;
+        highlightEl.classList.add('clip-badge-pre');
+
+        const badge = this.createBadgeElement(highlightEl);
+        highlightEl.insertAdjacentElement('afterbegin', badge);
+    }
+
+    /**
+     * Creates the badge element.
+     * @param {HTMLElement} highlightEl - The highlighted element.
+     * @returns {HTMLElement} The badge element.
+     */
+    createBadgeElement(highlightEl) {
         const plainText = decodeURIComponent(highlightEl.dataset.plaintext) || highlightEl.textContent;
         let language = highlightEl.className.match(/\blanguage-(?<lang>[a-z0-9_-]+)\b/i)?.groups?.lang || 'unknown';
-        log(4, 'ClipBadge: Detected language', language);
         let svgText = '';
         let htmlText = '';
+
         if (language.toLowerCase() === 'svg' && plainText) {
             svgText = highlightEl.innerHTML;
             highlightEl.innerHTML = plainText;
@@ -213,6 +292,7 @@ class ClipBadge {
             language = '';
             htmlText = highlightEl.innerHTML;
         }
+
         if (highlightEl.classList.contains('hljs-message')) {
             language = '';
             const right = highlightEl.querySelector('small > span > span.right');
@@ -221,29 +301,55 @@ class ClipBadge {
                 right.remove();
             }
         }
+
         const badge = this.settings.template.cloneNode(true);
         badge.classList.add('clip-badge');
         badge.querySelector('.clip-badge-language').textContent = language;
+
         if (svgText) {
-            const swapBtn = badge.querySelector('.clip-badge-swap');
-            swapBtn.classList.add('clip-badge-swap-enabled');
-            swapBtn.dataset.showing = 'html';
-            swapBtn.innerHTML = this.settings.codeButtonContent;
-            // Event to swap between code and image view.
-            swapBtn.addEventListener('click', () => {
-                log(5, 'ClipBadge: Swap button clicked, current showing', swapBtn.dataset.showing);
-                if (swapBtn.dataset.showing === 'html') {
-                    swapBtn.dataset.showing = 'text';
-                    swapBtn.innerHTML = this.settings.imageButtonContent;
-                    highlightEl.innerHTML = svgText;
-                } else {
-                    swapBtn.dataset.showing = 'html';
-                    swapBtn.innerHTML = this.settings.codeButtonContent;
-                    highlightEl.innerHTML = plainText;
-                }
-                highlightEl.insertAdjacentElement('afterbegin', badge);
-            });
+            this.handleSvg(badge, highlightEl, plainText, svgText);
         }
+
+        this.handleCopy(badge, highlightEl, plainText, htmlText);
+
+        return badge;
+    }
+
+    /**
+     * Handles the logic for SVG code blocks.
+     * @param {HTMLElement} badge - The badge element.
+     * @param {HTMLElement} highlightEl - The highlighted element.
+     * @param {string} plainText - The plain text content.
+     * @param {string} svgText - The SVG text content.
+     */
+    handleSvg(badge, highlightEl, plainText, svgText) {
+        const swapBtn = badge.querySelector('.clip-badge-swap');
+        swapBtn.classList.add('clip-badge-swap-enabled');
+        swapBtn.dataset.showing = 'html';
+        swapBtn.innerHTML = this.settings.codeButtonContent;
+        swapBtn.addEventListener('click', () => {
+            log(5, 'ClipBadge: Swap button clicked, current showing', swapBtn.dataset.showing);
+            if (swapBtn.dataset.showing === 'html') {
+                swapBtn.dataset.showing = 'text';
+                swapBtn.innerHTML = this.settings.imageButtonContent;
+                highlightEl.innerHTML = svgText;
+            } else {
+                swapBtn.dataset.showing = 'html';
+                swapBtn.innerHTML = this.settings.codeButtonContent;
+                highlightEl.innerHTML = plainText;
+            }
+            highlightEl.insertAdjacentElement('afterbegin', badge);
+        });
+    }
+
+    /**
+     * Handles the copy to clipboard logic.
+     * @param {HTMLElement} badge - The badge element.
+     * @param {HTMLElement} highlightEl - The highlighted element.
+     * @param {string} plainText - The plain text content.
+     * @param {string} htmlText - The HTML text content.
+     */
+    handleCopy(badge, highlightEl, plainText, htmlText) {
         const copyIcon = badge.querySelector('.clip-badge-copy-icon');
         copyIcon.className = this.settings.copyIconClass;
         copyIcon.classList.add('clip-badge-copy-icon');
@@ -267,7 +373,6 @@ class ClipBadge {
                     copyIcon.innerHTML = this.settings.copyIconContent;
                 }, 2000);
             };
-            // Use Clipboard API if available.
             if (navigator.clipboard?.write) {
                 const clipboardData = { 'text/plain': new Blob([textToCopy], { type: 'text/plain' }) };
                 if (htmlText) clipboardData['text/html'] = new Blob([htmlText], { type: 'text/html' });
@@ -276,7 +381,6 @@ class ClipBadge {
                     triggerError('Clipboard API failed:', err);
                 });
             } else {
-                // Fallback to textarea method.
                 const textArea = document.createElement('textarea');
                 textArea.value = textToCopy;
                 textArea.style.position = 'fixed';
@@ -298,16 +402,16 @@ class ClipBadge {
                 document.body.removeChild(textArea);
             }
         });
-        highlightEl.classList.add('clip-badge-pre');
-        highlightEl.insertAdjacentElement('afterbegin', badge);
     }
 
-    // Retrieves the badge template from the DOM or creates a default one.
+    /**
+     * Retrieves the badge template from the DOM or creates a default one.
+     * @returns {HTMLTemplateElement} The template element.
+     */
     getTemplate() {
         log(5, 'ClipBadge: getTemplate called');
         let node = document.querySelector(this.settings.templateSelector);
         if (!node) {
-            // Create default template if not found.
             node = document.createElement('template');
             node.innerHTML = `
 <style>
@@ -371,28 +475,5 @@ class ClipBadge {
 `;
         }
         return node;
-    }
-
-    // Adds badges to all highlighted elements in the content selector.
-    addAll() {
-        log(5, 'ClipBadge: addAll called');
-        const content = document.querySelector(this.settings.contentSelector);
-        content.querySelectorAll('.hljs, .hljs-nobg').forEach(el => this.addBadge(el));
-    }
-
-    // Adds badges to highlighted elements within a specific container.
-    addTo(container) {
-        log(5, 'ClipBadge: addTo called for container', container);
-        container.querySelectorAll('.hljs, .hljs-nobg').forEach(el => this.addBadge(el));
-        if (container.classList.contains('hljs') || container.classList.contains('hljs-nobg')) this.addBadge(container);
-    }
-
-    // Initializes the ClipBadge by appending styles and template.
-    init() {
-        log(4, 'ClipBadge: init called');
-        const node = this.getTemplate();
-        document.head.appendChild(node.content.querySelector('style').cloneNode(true));
-        this.settings.template = node.content.querySelector('.clip-badge').cloneNode(true);
-        if (this.settings.autoRun) this.addAll();
     }
 }

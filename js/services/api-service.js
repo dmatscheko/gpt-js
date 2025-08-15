@@ -1,6 +1,10 @@
+/**
+ * @fileoverview Service for handling all interactions with the OpenAI-compatible API.
+ */
+
 'use strict';
 
-import { log, triggerError } from '../utils.js';
+import { log, triggerError } from '../utils/logger.js';
 
 /**
  * @class ApiService
@@ -8,7 +12,7 @@ import { log, triggerError } from '../utils.js';
  */
 class ApiService {
     /**
-     * @param {import('../store.js').default} store - The application's state store.
+     * @param {import('../state/store.js').default} store - The application's state store.
      */
     constructor(store) {
         this.store = store;

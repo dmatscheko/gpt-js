@@ -1,50 +1,36 @@
+/**
+ * @fileoverview Main application class.
+ */
+
 'use strict';
 
-import { Chatbox } from './chatbox.js';
-import { startMessage, messageSubmit, messageStop } from './config.js';
-import { showLogin, showLogout, triggerError } from './utils.js';
-import { log, resetEditing } from './utils.js';
+import Store from './state/store.js';
+import ApiService from './services/api-service.js';
+import ChatService from './services/chat-service.js';
+import ConfigService from './services/config-service.js';
+import SettingsPanel from './components/settings-panel.js';
+import { ChatBox } from './components/chatbox.js';
+import ChatListView from './components/chatlist-view.js';
+import { log, triggerError } from './utils/logger.js';
+import { resetEditing } from './utils/chat.js';
+import { showLogin, showLogout } from './utils/ui.js';
 import { hooks, registerPlugin } from './hooks.js';
 import { formattingPlugins } from './plugins/formatting.js';
 import { alternativeNavigationPlugin, messageModificationPlugin } from './plugins/ui-controls.js';
 import { avatarsPlugin } from './plugins/avatars.js';
 import { mcpPlugin } from './plugins/mcp.js';
 import { errorBubblePlugin } from './plugins/error-bubble.js';
-import Store from './store.js';
-import ApiService from './services/api-service.js';
-import ChatService from './services/chat-service.js';
-import ChatListView from './views/chatlist-view.js';
-import SettingsView from './views/settings-view.js';
+import { startMessage, messageSubmit, messageStop } from './config.js';
 
 /**
- * @class Controller
- * Main application orchestrator. Initializes services and views,
- * and handles the main application logic that isn't delegated.
+ * @class App
+ * Main application orchestrator.
  */
-class Controller {
+class App {
     constructor() {
-        log(5, 'Controller: Constructor called');
-        this.store = new Store({
-            receiving: false,
-            regenerateLastAnswer: false,
-            controller: new AbortController(),
-            apiKey: localStorage.getItem('gptChat_apiKey') || '',
-            editingPos: null,
-            chats: [],
-            currentChat: null,
-        });
-        this.store.set('controllerInstance', this);
-
-        this.apiService = new ApiService(this.store);
-        this.chatService = new ChatService(this.store);
-        this.chatListView = new ChatListView(this.chatService);
-        this.settingsView = new SettingsView(this.store, this.apiService, this);
-
-        this.chatlog = null;
-        this.boundUpdate = null;
-
+        log(5, 'App: Constructor called');
         this.ui = {
-            chatlogEl: null,
+            chatBox: null,
             messageEl: document.getElementById('messageInput'),
             submitButton: document.getElementById('submitButton'),
             newChatButton: document.getElementById('newChatButton'),
@@ -53,6 +39,34 @@ class Controller {
             temperatureEl: document.getElementById('temperature'),
             topPEl: document.getElementById('topP'),
         };
+        this.store = new Store({
+            receiving: false,
+            regenerateLastAnswer: false,
+            controller: new AbortController(),
+            editingPos: null,
+            chats: [],
+            currentChat: null,
+            ui: this.ui,
+        });
+
+        this.configService = new ConfigService(this.store);
+        this.apiService = new ApiService(this.store);
+        this.chatService = new ChatService(this.store);
+
+        this.settingsPanel = new SettingsPanel({
+            onApiKeyChange: (apiKey) => this.handleApiKeyChange(apiKey),
+            onEndpointChange: (endpoint) => this.handleEndpointChange(endpoint),
+            onRefreshModels: () => this.loadModels(),
+            onModelChange: (model) => this.configService.setModel(model),
+        });
+
+        this.chatListView = new ChatListView({
+            onChatSelected: (chatId) => this.chatService.switchChat(chatId),
+            onChatDeleted: (chatId) => this.chatService.deleteChat(chatId),
+            onTitleEdited: (chatId, newTitle) => this.chatService.updateChatTitle(chatId, newTitle),
+        });
+
+        this.ui.chatBox = new ChatBox(this.store);
 
         this.store.subscribe('receiving', (val) => {
             this.ui.submitButton.innerHTML = val ? messageStop : messageSubmit;
@@ -62,20 +76,48 @@ class Controller {
             this.onChatSwitched(chat);
             this.chatListView.render(this.store.get('chats'), chat);
         });
+        hooks.onGenerateAIResponse.push((options, chatlog) => this.generateAIResponse(options, chatlog));
     }
 
     /**
-     * Initializes the application, setting up plugins, error handlers, views, and services.
+     * Initializes the application.
      */
     async init() {
-        log(3, 'Controller: init called');
+        log(3, 'App: init called');
+        this.registerPlugins();
+        this.setupGlobalErrorHandlers();
+
+        this.ui.chatBox.onUpdate = () => this.chatService.persistChats();
+
+        this.chatService.init();
+
+        this.settingsPanel.setApiKey(this.configService.getApiKey());
+        this.settingsPanel.setEndpoint(this.configService.getEndpoint());
+
+        await this.handleLogin();
+
+        hooks.onSettingsRender.forEach(fn => fn(this.settingsPanel.ui.settingsEl));
+
+        window.addEventListener('beforeunload', () => this.chatService.persistChats());
+        this.setUpEventListeners();
+    }
+
+    /**
+     * Registers all the plugins.
+     */
+    registerPlugins() {
         registerPlugin(mcpPlugin);
         formattingPlugins.forEach(registerPlugin);
         registerPlugin(alternativeNavigationPlugin);
         registerPlugin(messageModificationPlugin);
         registerPlugin(avatarsPlugin);
         registerPlugin(errorBubblePlugin);
+    }
 
+    /**
+     * Sets up global error handlers.
+     */
+    setupGlobalErrorHandlers() {
         window.addEventListener('error', (event) => {
             log(1, 'Global error', event.error || event.message);
             triggerError(event.error || new Error(event.message));
@@ -86,108 +128,82 @@ class Controller {
             triggerError(event.reason);
             event.preventDefault();
         });
-
-        this.ui.chatlogEl = new Chatbox(null, document.getElementById('chat'), this.store);
-        this.ui.chatlogEl.onUpdate = () => this.chatService.persistChats();
-        this.settingsView.init();
-        this.chatService.init();
-
-        const hasStoredKey = localStorage.getItem('gptChat_apiKey') !== null;
-        if (hasStoredKey) {
-            let success = this.loadModelsFromStorage();
-            if (!success) {
-                success = await this.loadModels();
-            }
-            if (success) {
-                showLogout();
-            } else {
-                this.settingsView.ui.settingsEl.classList.add('open');
-                setTimeout(() => this.settingsView.ui.apiKeyEl.focus(), 100);
-                triggerError('Please login with correct API Endpoint and API Key.');
-            }
-        } else {
-            showLogin();
-            this.settingsView.populateModels([]);
-            this.settingsView.ui.settingsEl.classList.add('open');
-            setTimeout(() => this.settingsView.ui.endpointEl.focus(), 100);
-            triggerError('Please login with correct API Endpoint and API Key.');
-        }
-        window.addEventListener('beforeunload', () => this.chatService.persistChats());
-        this.setUpEventListeners();
     }
 
     /**
-     * Handles the logic when the active chat is switched.
-     * @param {Object} chat - The new active chat object.
+     * Handles the login process.
+     */
+    async handleLogin() {
+        const endpoint = this.configService.getEndpoint();
+        if (endpoint) {
+            const success = await this.loadModels();
+            if (success) {
+                showLogout();
+            } else {
+                showLogin();
+                this.settingsPanel.toggle();
+            }
+        } else {
+            showLogin();
+            this.settingsPanel.populateModels([]);
+            this.settingsPanel.toggle();
+        }
+    }
+
+    /**
+     * Handles the API key change.
+     * @param {string} apiKey - The new API key.
+     */
+    handleApiKeyChange(apiKey) {
+        this.configService.setApiKey(apiKey);
+    }
+
+    /**
+     * Handles the endpoint change.
+     * @param {string} endpoint - The new endpoint.
+     */
+    handleEndpointChange(endpoint) {
+        this.configService.setEndpoint(endpoint);
+        this.handleLogin();
+    }
+
+    /**
+     * Handles chat switching.
+     * @param {Object} chat - The chat to switch to.
      */
     onChatSwitched(chat) {
-        log(3, 'Controller: onChatSwitched called for chat', chat?.id);
-        if (!chat) {
-            this.ui.chatlogEl.chatlog = null;
-            this.ui.chatlogEl.update();
-            return;
-        }
-
-        const oldChatlog = this.chatlog;
-        if (oldChatlog && this.boundUpdate) {
-            oldChatlog.unsubscribe(this.boundUpdate);
-        }
-
-        this.chatlog = chat.chatlog;
-        this.ui.chatlogEl.chatlog = this.chatlog;
-        this.boundUpdate = this.ui.chatlogEl.update.bind(this.ui.chatlogEl, false);
-        this.chatlog.subscribe(this.boundUpdate);
-        this.ui.chatlogEl.update();
-
+        log(3, 'App: onChatSwitched called for chat', chat?.id);
+        this.ui.chatBox.setChatlog(chat?.chatlog || null);
         if (window.innerWidth <= 1037) {
             document.getElementById('chatListContainer').style.display = 'none';
         }
     }
 
     /**
-     * Loads models from local storage if available.
-     * @returns {boolean} True if models were loaded from storage, false otherwise.
-     */
-    loadModelsFromStorage() {
-        log(3, 'Controller: loadModelsFromStorage called');
-        const storedModels = localStorage.getItem('gptChat_models');
-        if (storedModels) {
-            let models;
-            try {
-                models = JSON.parse(storedModels);
-            } catch (err) {
-                log(1, 'Controller: Failed to parse stored models', err);
-                triggerError('Failed to parse stored models:', err);
-                return false;
-            }
-            this.settingsView.populateModels(models);
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Fetches models from the API and populates the settings view.
-     * @returns {Promise<boolean>} True if models were loaded successfully, false otherwise.
+     * Fetches models from the API.
+     * @returns {Promise<boolean>} True if models were loaded successfully.
      */
     async loadModels() {
-        log(3, 'Controller: loadModels called');
-        const endpoint = this.settingsView.ui.endpointEl.value;
-        const apiKey = this.store.get('apiKey');
+        log(3, 'App: loadModels called');
+        const endpoint = this.configService.getEndpoint();
+        const apiKey = this.configService.getApiKey();
+        if (!endpoint) {
+            return false;
+        }
         try {
             const models = await this.apiService.getModels(endpoint, apiKey);
             localStorage.setItem('gptChat_models', JSON.stringify(models));
-            this.settingsView.populateModels(models);
+            this.settingsPanel.populateModels(models);
+            this.settingsPanel.setSelectedModel(this.configService.getModel());
             return true;
         } catch (err) {
-            log(1, 'Controller: Failed to load models', err);
+            log(1, 'App: Failed to load models', err);
             triggerError('Failed to load models:', err);
             if (localStorage.getItem('gptChat_apiKey') !== null) {
-                localStorage.removeItem('gptChat_apiKey');
+                this.configService.setApiKey('');
                 localStorage.removeItem('gptChat_models');
-                this.store.set('apiKey', '');
                 showLogin();
-                this.settingsView.populateModels([]);
+                this.settingsPanel.populateModels([]);
                 triggerError('Session invalid, logged out.');
             }
             return false;
@@ -195,12 +211,12 @@ class Controller {
     }
 
     /**
-     * Sets up the main event listeners for the application.
+     * Sets up the main event listeners.
      */
     setUpEventListeners() {
-        log(3, 'Controller: setUpEventListeners called');
+        log(3, 'App: setUpEventListeners called');
         this.ui.submitButton.addEventListener('click', () => {
-            log(4, 'Controller: Submit button clicked, receiving:', this.store.get('receiving'));
+            log(4, 'App: Submit button clicked, receiving:', this.store.get('receiving'));
             if (this.store.get('receiving')) {
                 this.store.get('controller').abort();
                 return;
@@ -228,23 +244,23 @@ class Controller {
             if (height > this.clientHeight) this.style.height = `${height}px`;
         });
         this.ui.messageEl.addEventListener('blur', () => {
-            resetEditing(this.store, this.chatlog, this.ui.chatlogEl);
+            resetEditing(this.store, this.ui.chatBox.chatlog, this.ui.chatBox);
         });
         document.addEventListener('keydown', event => {
             if (event.key === 'Escape') {
                 this.store.get('controller').abort();
-                resetEditing(this.store, this.chatlog, this.ui.chatlogEl);
+                resetEditing(this.store, this.ui.chatBox.chatlog, this.ui.chatBox);
             }
         });
         this.ui.newChatButton.addEventListener('click', () => {
-            log(4, 'Controller: New chat button clicked');
+            log(4, 'App: New chat button clicked');
             if (this.store.get('receiving')) this.store.get('controller').abort();
             this.ui.messageEl.value = startMessage;
             this.ui.messageEl.style.height = 'auto';
             this.chatService.createNewChat();
         });
         this.ui.saveChatButton.addEventListener('click', () => {
-            log(4, 'Controller: Save chat button clicked');
+            log(4, 'App: Save chat button clicked');
             const current = this.store.get('currentChat');
             if (!current) return;
             const jsonData = JSON.stringify({ title: current.title, data: current.chatlog.toJSON() });
@@ -258,7 +274,7 @@ class Controller {
             document.body.removeChild(a);
         });
         this.ui.loadChatButton.addEventListener('click', () => {
-            log(4, 'Controller: Load chat button clicked');
+            log(4, 'App: Load chat button clicked');
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'application/json';
@@ -273,31 +289,31 @@ class Controller {
         });
 
         document.getElementById('toggleChatList').addEventListener('click', () => {
-            log(5, 'Controller: Toggle chat list clicked');
+            log(5, 'App: Toggle chat list clicked');
             const cl = document.getElementById('chatListContainer');
             cl.style.display = cl.style.display === 'block' ? 'none' : 'block';
         });
     }
 
     /**
-     * Generates an AI response for the given chatlog.
-     * @param {Object} options - Options for the generation (e.g., model, temperature).
-     * @param {Chatlog} targetChatlog - The chatlog to generate a response for.
+     * Generates an AI response.
+     * @param {Object} [options={}] - Options for the generation.
+     * @param {Chatlog} [targetChatlog=this.chatlog] - The chatlog to generate a response for.
      */
-    async generateAIResponse(options = {}, targetChatlog = this.chatlog) {
-        log(3, 'Controller: generateAIResponse called');
+    async generateAIResponse(options = {}, targetChatlog = this.ui.chatBox.chatlog) {
+        log(3, 'App: generateAIResponse called');
         if (this.store.get('receiving')) return;
-        let model = options.model || document.querySelector('input[name="model"]:checked')?.value;
+        let model = options.model || this.configService.getModel() || document.querySelector('input[name="model"]:checked')?.value;
         if (model === 'custom') {
-            model = (options.model || this.settingsView.ui.customModelInput.value.trim());
+            model = (options.model || this.settingsPanel.ui.customModelInput.value.trim());
             if (!model) {
-                log(2, 'Controller: No custom model ID');
+                log(2, 'App: No custom model ID');
                 triggerError('Please enter a custom model ID.');
                 return;
             }
         }
         if (!model) {
-            log(2, 'Controller: No model selected');
+            log(2, 'App: No model selected');
             triggerError('Please select a model.');
             return;
         }
@@ -321,10 +337,10 @@ class Controller {
                 }
                 payload.messages[0].content = systemContent;
             }
-            payload = hooks.beforeApiCall.reduce((p, fn) => fn(p, this.ui.chatlogEl) || p, payload);
+            payload = hooks.beforeApiCall.reduce((p, fn) => fn(p, this.ui.chatBox) || p, payload);
 
-            const endpoint = this.settingsView.ui.endpointEl.value;
-            const apiKey = this.store.get('apiKey');
+            const endpoint = this.configService.getEndpoint();
+            const apiKey = this.configService.getApiKey();
             const abortSignal = this.store.get('controller').signal;
             const reader = await this.apiService.streamAPIResponse(payload, endpoint, apiKey, abortSignal);
 
@@ -347,23 +363,20 @@ class Controller {
                     delta += data.choices[0].delta.content || '';
                 });
                 if (delta === '') continue;
-                log(5, 'Controller: Received chunk', delta);
+                log(5, 'App: Received chunk', delta);
                 hooks.onChunkReceived.forEach(fn => fn(delta));
                 targetMessage.appendContent(delta);
-                if (targetChatlog === this.chatlog) {
-                    targetChatlog.notify();
-                }
+                targetChatlog.notify();
             }
             const lastMessage = targetChatlog.getLastMessage();
-            hooks.onMessageComplete.forEach(fn => fn(lastMessage, targetChatlog, this.ui.chatlogEl));
+            hooks.onMessageComplete.forEach(fn => fn(lastMessage, targetChatlog, this.ui.chatBox));
 
         } catch (error) {
             if (error.name === 'AbortError') {
-                log(3, 'Controller: Response aborted');
+                log(3, 'App: Response aborted');
                 this.store.set('controller', new AbortController());
                 const lastMessage = targetChatlog.getLastMessage();
                 if (lastMessage && lastMessage.value === null) {
-                    // Remove dangling null message on abort
                     const lastAlternatives = targetChatlog.getLastAlternatives();
                     lastAlternatives.messages.pop();
                     lastAlternatives.activeMessageIndex = lastAlternatives.messages.length - 1;
@@ -374,7 +387,7 @@ class Controller {
                 }
                 return;
             }
-            log(1, 'Controller: generateAIResponse error', error);
+            log(1, 'App: generateAIResponse error', error);
             triggerError(error.message);
             const lastMessage = targetChatlog.getLastMessage();
             if (lastMessage.value === null) {
@@ -389,38 +402,37 @@ class Controller {
             if (targetMessage.value !== null) {
                 targetMessage.metadata = { model, temperature, top_p: topP };
             }
-            if (targetChatlog === this.chatlog) {
-                targetChatlog.notify();
-            }
+            targetChatlog.notify();
             this.chatService.persistChats();
         }
     }
 
     /**
-     * Submits a user message to the chatlog and generates an AI response if the user message is the last message in the chat.
-     * @param {string} message - The user's message.
-     * @param {string} userRole - The role of the user (e.g., 'user', 'system').
+     * Submits a user message.
+     * @param {string} message - The message to submit.
+     * @param {string} userRole - The role of the user.
      */
     async submitUserMessage(message, userRole) {
-        log(3, 'Controller: submitUserMessage called with role', userRole);
+        log(3, 'App: submitUserMessage called with role', userRole);
         const currentChatlog = this.chatService.getCurrentChatlog();
         if (!currentChatlog) return;
         const editedPos = this.store.get('editingPos');
+        log(4, 'App: editingPos is', editedPos);
         if (editedPos !== null) {
-            log(4, 'Controller: Editing message at pos', editedPos);
+            log(4, 'App: Editing message at pos', editedPos);
             const msg = currentChatlog.getNthMessage(editedPos);
             if (msg) {
                 msg.value.role = userRole;
                 msg.setContent(message.trim());
                 msg.cache = null;
-                this.ui.chatlogEl.update();
+                this.ui.chatBox.update();
             }
             this.store.set('editingPos', null);
             document.getElementById('user').checked = true;
             const editedMsg = currentChatlog.getNthMessage(editedPos);
             if (editedMsg.value.role !== 'assistant' && editedMsg.answerAlternatives === null && currentChatlog.getFirstMessage() !== editedMsg) {
                 currentChatlog.addMessage({ role: 'assistant', content: null });
-                this.ui.chatlogEl.update();
+                this.ui.chatBox.update();
                 await this.generateAIResponse({}, currentChatlog);
             }
             return;
@@ -436,7 +448,7 @@ class Controller {
             }
             const newMessage = currentChatlog.addMessage({ role: userRole, content: modifiedContent });
             hooks.afterMessageAdd.forEach(fn => fn(newMessage));
-            this.ui.chatlogEl.update();
+            this.ui.chatBox.update();
             return;
         }
         if (!this.store.get('regenerateLastAnswer')) {
@@ -452,9 +464,9 @@ class Controller {
             currentChatlog.addMessage(null);
         }
         this.store.set('regenerateLastAnswer', false);
-        this.ui.chatlogEl.update();
+        this.ui.chatBox.update();
         await this.generateAIResponse({}, currentChatlog);
     }
 }
 
-export default Controller;
+export default App;

@@ -1,3 +1,7 @@
+"""
+This script serves the static files for the chat application and runs an MCP proxy.
+"""
+
 import os
 import json
 import http.server
@@ -14,10 +18,15 @@ from starlette.middleware.cors import CORSMiddleware
 
 
 class CustomHandler(http.server.SimpleHTTPRequestHandler):
+    """
+    Custom HTTP request handler to serve static files and the API configuration.
+    """
     def log_message(self, format, *args):
+        """Logs an HTTP request."""
         logging.info(f"WEB: {format % args}")
 
     def do_GET(self):
+        """Handles GET requests."""
         if self.path == "/api/config":
             self.send_response(200)
             self.send_header("Content-type", "application/json")
@@ -29,7 +38,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
 
 
 def run_file_server():
+    """
+    Runs the static file server.
+    """
     class ReuseTCPServer(socketserver.TCPServer):
+        """
+        A TCP server that allows address reuse.
+        """
         allow_reuse_address = True
 
     with ReuseTCPServer(("", 8000), CustomHandler) as server:
@@ -38,6 +53,9 @@ def run_file_server():
 
 
 def load_config():
+    """
+    Loads the MCP configuration from a JSON file.
+    """
     path = os.getenv("MCP_CONFIG", "mcp_config.json")
     if not os.path.exists(path):
         logging.warning(f"{path} not found, using empty config")
@@ -54,6 +72,9 @@ def load_config():
 
 
 def setup_proxy(mcp_servers):
+    """
+    Sets up the MCP proxy.
+    """
     if not mcp_servers:
         return None
     proxy = FastMCP.as_proxy({"mcpServers": mcp_servers}, name="Composite Proxy")
@@ -71,11 +92,17 @@ def setup_proxy(mcp_servers):
 
 
 def shutdown(sig, frame):
+    """
+    Shuts down the application gracefully.
+    """
     logging.info("Shutting down gracefully")
     sys.exit(0)
 
 
 def main():
+    """
+    Main function to run the application.
+    """
     parser = argparse.ArgumentParser(description="Run MCP proxy and web server")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging")
     args = parser.parse_args()

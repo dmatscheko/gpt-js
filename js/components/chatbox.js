@@ -1,21 +1,56 @@
+/**
+ * @fileoverview The ChatBox component is responsible for displaying chat messages.
+ */
+
 'use strict';
 
-import { log } from './utils.js';
-import { hooks } from './hooks.js';
+import { log } from '../utils/logger.js';
+import { hooks } from '../hooks.js';
+import { triggerError } from '../utils/logger.js';
 
-// Responsible for displaying the chat messages in the UI.
-class Chatbox {
-    constructor(chatlog, container, store) {
-        log(5, 'Chatbox: Constructor called');
-        this.chatlog = chatlog;
-        this.container = container;
+/**
+ * @class ChatBox
+ * Responsible for displaying the chat messages in the UI.
+ */
+class ChatBox {
+    /**
+     * @param {import('../state/store.js').default} store - The application's state store.
+     */
+    constructor(store) {
+        log(5, 'ChatBox: Constructor called');
         this.store = store;
+        this.container = document.getElementById('chat');
+        this.chatlog = null;
         this.onUpdate = null; // Callback for after updates.
+        this.boundUpdate = this.update.bind(this);
     }
 
-    // Updates the HTML content inside the chat window, optionally scrolling to the bottom.
+    /**
+     * Sets the chatlog for the chatbox to display.
+     * @param {import('./chatlog.js').Chatlog} chatlog - The chatlog to display.
+     */
+    setChatlog(chatlog) {
+        if (this.chatlog) {
+            this.chatlog.unsubscribe(this.boundUpdate);
+        }
+        this.chatlog = chatlog;
+        if (this.chatlog) {
+            this.chatlog.subscribe(this.boundUpdate);
+        }
+        this.update();
+    }
+
+    /**
+     * Updates the HTML content of the chat window.
+     * @param {boolean} [scroll=true] - Whether to scroll to the bottom.
+     */
     update(scroll = true) {
-        log(5, 'Chatbox: update called, scroll:', scroll);
+        log(5, 'ChatBox: update called, scroll:', scroll);
+        if (!this.chatlog) {
+            this.container.innerHTML = '';
+            return;
+        }
+
         const shouldScrollDown = scroll && this.#isScrolledToBottom();
         const fragment = document.createDocumentFragment();
         let alternative = this.chatlog.rootAlternatives;
@@ -59,16 +94,27 @@ class Chatbox {
         if (this.onUpdate) this.onUpdate();
     }
 
-    // Checks if the chat container is scrolled to the bottom.
+    /**
+     * Checks if the chat container is scrolled to the bottom.
+     * @returns {boolean} True if scrolled to the bottom.
+     * @private
+     */
     #isScrolledToBottom() {
-        log(5, 'Chatbox: #isScrolledToBottom called');
+        log(5, 'ChatBox: #isScrolledToBottom called');
         const { scrollHeight, clientHeight, scrollTop } = this.container.parentElement;
         return scrollHeight - clientHeight <= scrollTop + 5;
     }
 
-    // Formats a single message as an HTML element.
+    /**
+     * Formats a single message as an HTML element.
+     * @param {import('./chatlog.js').Message} message - The message to format.
+     * @param {number} pos - The position of the message in the chat.
+     * @param {number} msgIdx - The index of the message in its alternatives.
+     * @param {number} msgCnt - The total number of alternatives.
+     * @returns {HTMLElement} The formatted message element.
+     */
     formatMessage(message, pos, msgIdx, msgCnt) {
-        log(5, 'Chatbox: formatMessage called for pos', pos);
+        log(5, 'ChatBox: formatMessage called for pos', pos);
         const el = document.createElement('div');
         el.classList.add('message', message.value.role === 'assistant' ? 'pong' : 'ping');
         if (message.value.role === 'system') el.classList.add('system');
@@ -106,9 +152,15 @@ class Chatbox {
         return el;
     }
 
-    // Formats message content.
+    /**
+     * Formats the content of a message.
+     * @param {string} text - The text content to format.
+     * @param {import('./chatlog.js').Message} message - The message being formatted.
+     * @returns {HTMLElement | null} The formatted content element or null.
+     * @private
+     */
     #formatContent(text, message) {
-        log(5, 'Chatbox: #formatContent called');
+        log(5, 'ChatBox: #formatContent called');
         if (!text) return null;
         try {
             text = text.trim();
@@ -120,7 +172,7 @@ class Chatbox {
             hooks.onPostFormatContent.forEach(fn => { fn(wrapper, message); });
             return wrapper;
         } catch (error) {
-            log(1, 'Chatbox: Formatting error', error);
+            log(1, 'ChatBox: Formatting error', error);
             triggerError('Formatting error:', error);
             const wrapper = document.createElement('div');
             wrapper.classList.add('content');
@@ -130,4 +182,4 @@ class Chatbox {
     }
 }
 
-export { Chatbox };
+export { ChatBox };
