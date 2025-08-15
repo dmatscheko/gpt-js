@@ -213,6 +213,7 @@
 .delete-connection-btn {
     cursor: pointer;
     font-size: 14px;
+    pointer-events: all;
 }
 .delete-connection-btn:hover {
     opacity: 0.7;

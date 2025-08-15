@@ -221,7 +221,10 @@ class ChatService {
             chatlog.load(data);
             const id = Date.now().toString();
             const title = loaded.title || 'Imported Chat';
-            this.chats.push({ id, title, chatlog });
+            const agents = loaded.agents || [];
+            const flow = loaded.flow || { steps: [], connections: [] };
+            if (!flow.connections) flow.connections = [];
+            this.chats.push({ id, title, chatlog, agents, flow });
             this.store.set('chats', this.chats);
             this.switchChat(id);
             this.persistChats();

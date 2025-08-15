@@ -263,7 +263,12 @@ class App {
             log(4, 'App: Save chat button clicked');
             const current = this.store.get('currentChat');
             if (!current) return;
-            const jsonData = JSON.stringify({ title: current.title, data: current.chatlog.toJSON() });
+            const jsonData = JSON.stringify({
+                title: current.title,
+                data: current.chatlog.toJSON(),
+                agents: current.agents || [],
+                flow: current.flow || { steps: [], connections: [] }
+            });
             const blob = new Blob([jsonData], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
