@@ -11,6 +11,7 @@ import ConfigService from './services/config-service.js';
 import SettingsPanel from './components/settings-panel.js';
 import { ChatBox } from './components/chatbox.js';
 import ChatListView from './components/chatlist-view.js';
+import TabManager from './components/tab-manager.js';
 import { log, triggerError } from './utils/logger.js';
 import { resetEditing } from './utils/chat.js';
 import { showLogin, showLogout } from './utils/ui.js';
@@ -20,6 +21,7 @@ import { alternativeNavigationPlugin, messageModificationPlugin } from './plugin
 import { avatarsPlugin } from './plugins/avatars.js';
 import { mcpPlugin } from './plugins/mcp.js';
 import { errorBubblePlugin } from './plugins/error-bubble.js';
+import { agentsPlugin } from './plugins/agents.js';
 import { startMessage, messageSubmit, messageStop } from './config.js';
 
 /**
@@ -66,6 +68,12 @@ class App {
             onTitleEdited: (chatId, newTitle) => this.chatService.updateChatTitle(chatId, newTitle),
         });
 
+        const viewContainer = document.getElementById('view-container');
+        const chatContainer = document.getElementById('chatContainer');
+        viewContainer.innerHTML = '';
+        this.tabManager = new TabManager(viewContainer);
+        this.tabManager.addTab('chat', 'Chat', chatContainer, true);
+
         this.ui.chatBox = new ChatBox(this.store);
 
         this.store.subscribe('receiving', (val) => {
@@ -96,6 +104,7 @@ class App {
 
         await this.handleLogin();
 
+        hooks.onRegisterTab.forEach(fn => fn(this.tabManager, this));
         hooks.onSettingsRender.forEach(fn => fn(this.settingsPanel.ui.settingsEl));
 
         window.addEventListener('beforeunload', () => this.chatService.persistChats());
@@ -106,6 +115,7 @@ class App {
      * Registers all the plugins.
      */
     registerPlugins() {
+        registerPlugin(agentsPlugin);
         registerPlugin(mcpPlugin);
         formattingPlugins.forEach(registerPlugin);
         registerPlugin(alternativeNavigationPlugin);
@@ -329,9 +339,18 @@ class App {
             if (payload.messages.length <= 1) return;
             if (payload.messages[0]?.role === 'system') {
                 let systemContent = payload.messages[0].content;
+
+                // Remove existing agent definition
+                systemContent = systemContent.replace(/<dma:agent_definition>[\s\S]*?<\/dma:agent_definition>\n?/, '');
+
                 for (let fn of hooks.onModifySystemPrompt) {
-                    systemContent = fn(systemContent) || systemContent;
+                    systemContent = fn(systemContent, this) || systemContent;
                 }
+
+                if (options.agentSystemPrompt) {
+                    systemContent += `\n<dma:agent_definition>\n${options.agentSystemPrompt}\n</dma:agent_definition>`;
+                }
+
                 payload.messages[0].content = systemContent;
             }
             payload = hooks.beforeApiCall.reduce((p, fn) => fn(p, this.ui.chatBox) || p, payload);
@@ -366,7 +385,7 @@ class App {
                 targetChatlog.notify();
             }
             const lastMessage = targetChatlog.getLastMessage();
-            hooks.onMessageComplete.forEach(fn => fn(lastMessage, targetChatlog, this.ui.chatBox));
+            hooks.onMessageComplete.forEach(fn => fn(lastMessage, targetChatlog, this));
 
         } catch (error) {
             if (error.name === 'AbortError') {

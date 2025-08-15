@@ -16,6 +16,7 @@ export const hooks = {
     onStateChange: [], // Called on central state changes (e.g., receiving, apiKey). Args: (key, value).
     onChatUpdated: [], // Called when chatlog updates. Args: (chatlog).
     onGenerateAIResponse: [], // Called to request an AI response. Args: (options, chatlog).
+    onRegisterTab: [], // Called to allow plugins to register tabs. Args: (tabManager).
 };
 
 window.hooks = hooks; // TODO: only for testing: remove
