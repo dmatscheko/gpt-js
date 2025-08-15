@@ -374,6 +374,7 @@ class App {
         } catch (error) {
             if (error.name === 'AbortError') {
                 log(3, 'App: Response aborted');
+                hooks.onCancel.forEach(fn => fn());
                 this.store.set('controller', new AbortController());
                 const lastMessage = targetChatlog.getLastMessage();
                 if (lastMessage && lastMessage.value === null) {
