@@ -53,4 +53,4 @@ export const defaultEndpoint = 'https://api.openai.com/v1/chat/completions';
  * 0: none, 1: errors, 2: warnings, 3: info, 4: debug, 5: trace, 6: full trace (includes partial AI messages during streaming)
  * @type {number}
  */
-export const DEBUG_LEVEL = 5;
+export const DEBUG_LEVEL = 3;
