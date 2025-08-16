@@ -419,10 +419,10 @@ class App {
      * @param {string} userRole - The role of the user.
      */
     async submitUserMessage(message, userRole) {
-        // TODO: submitUserMessage is called when a flow advances to the next step, and it sometimes even streams an AI response, but that is not visible. Only the first user message and response is visible.
         log(3, 'App: submitUserMessage called with role', userRole);
         const currentChatlog = this.chatService.getCurrentChatlog();
         if (!currentChatlog) return;
+
         const editedPos = this.store.get('editingPos');
         log(4, 'App: editingPos is', editedPos);
         if (editedPos !== null) {
@@ -444,8 +444,10 @@ class App {
             }
             return;
         }
+
         if (!this.store.get('regenerateLastAnswer') && !message) return;
-        if (this.store.get('receiving')) return;
+        if (this.store.get('receiving') && !agentsPlugin.flowRunning) return; // Allow flow to submit messages
+
         if (userRole === 'assistant') {
             let modifiedContent = message;
             for (let fn of hooks.beforeUserMessageAdd) {
@@ -458,6 +460,7 @@ class App {
             this.ui.chatBox.update();
             return;
         }
+
         if (!this.store.get('regenerateLastAnswer')) {
             message = message.trim();
             let modifiedContent = message;
@@ -470,9 +473,14 @@ class App {
             hooks.afterMessageAdd.forEach(fn => fn(newMessage));
             currentChatlog.addMessage(null);
         }
+
         this.store.set('regenerateLastAnswer', false);
-        this.ui.chatBox.update();
+        this.ui.chatBox.update(); // Initial update to show user message
+
         await this.generateAIResponse({}, currentChatlog);
+
+        // Final update to ensure UI is consistent after response generation, especially for flows.
+        this.ui.chatBox.update();
     }
 }
 

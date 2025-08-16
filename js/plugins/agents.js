@@ -144,14 +144,18 @@ function renderFlow(store) {
             line.setAttribute('stroke-width', '2');
             line.setAttribute('marker-end', 'url(#arrowhead)');
             svgLayer.appendChild(line);
-            const deleteIcon = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            deleteIcon.setAttribute('x', (x1 + x2) / 2 - 5);
-            deleteIcon.setAttribute('y', (y1 + y2) / 2 + 5);
-            deleteIcon.textContent = '🗑️';
-            deleteIcon.setAttribute('class', 'delete-connection-btn');
-            deleteIcon.dataset.from = conn.from;
-            deleteIcon.dataset.to = conn.to;
-            svgLayer.appendChild(deleteIcon);
+
+            // Create a proper HTML button for deleting connections
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '&#x1F5D1;'; // Trash can emoji
+            deleteBtn.className = 'delete-connection-btn agents-flow-btn';
+            deleteBtn.dataset.from = conn.from;
+            deleteBtn.dataset.to = conn.to;
+            deleteBtn.style.position = 'absolute';
+            deleteBtn.style.left = `${(x1 + x2) / 2 - 15}px`;
+            deleteBtn.style.top = `${(y1 + y2) / 2 - 15}px`;
+            deleteBtn.style.zIndex = '10';
+            nodeContainer.appendChild(deleteBtn);
         }
     });
 }
@@ -265,22 +269,35 @@ const agentsPlugin = {
     },
 
     handleFlowCanvasClick(e) {
-        // TODO: it might be that this handler is responsible to clear the focus from the input elements of flow steps. that makes it very hard to write something into those input elements. Maybe the click needs to propagate?
         const target = e.target;
+
+        // Prevent interference with form elements inside a step card
+        if (target.closest('.flow-step-card') && ['TEXTAREA', 'SELECT', 'OPTION', 'LABEL'].includes(target.tagName)) {
+            return;
+        }
+
         const chat = this.store.get('currentChat');
+        let chatModified = false;
+
         if (target.classList.contains('delete-flow-step-btn')) {
             const stepId = target.dataset.id;
-            if (!stepId || !confirm('Are you sure you want to delete this step?')) return;
-            chat.flow.steps = chat.flow.steps.filter(s => s.id !== stepId);
-            chat.flow.connections = (chat.flow.connections || []).filter(c => c.from !== stepId && c.to !== stepId);
+            if (stepId && confirm('Are you sure you want to delete this step?')) {
+                chat.flow.steps = chat.flow.steps.filter(s => s.id !== stepId);
+                chat.flow.connections = (chat.flow.connections || []).filter(c => c.from !== stepId && c.to !== stepId);
+                chatModified = true;
+            }
         } else if (target.classList.contains('delete-connection-btn')) {
-            // TODO: this part is never called because the SVG elements are not clickable somehow. Maybe make a small button instead for the delete-connection-btn.
             const fromId = target.dataset.from;
             const toId = target.dataset.to;
-            if (!fromId || !toId || !confirm('Are you sure you want to delete this connection?')) return;
-            chat.flow.connections = (chat.flow.connections || []).filter(c => !(c.from === fromId && c.to === toId));
+            if (fromId && toId && confirm('Are you sure you want to delete this connection?')) {
+                chat.flow.connections = (chat.flow.connections || []).filter(c => !(c.from === fromId && c.to === toId));
+                chatModified = true;
+            }
         }
-        this.store.set('currentChat', { ...chat });
+
+        if (chatModified) {
+            this.store.set('currentChat', { ...chat });
+        }
     },
 
     handleFlowCanvasMouseDown(e) {
