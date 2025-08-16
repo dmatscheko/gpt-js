@@ -26,6 +26,12 @@ let mcpSessionId = null;
  */
 let cachedToolsSection = '';
 
+/**
+ * The promise for ongoing initialization.
+ * @type {Promise<void>|null}
+ */
+let initPromise = null;
+
 (async () => {
     try {
         const response = await fetch('/api/config');
@@ -138,7 +144,7 @@ export const mcpPlugin = {
             // Always remove the old tools section first
             let content = systemMessage.value.content;
             const originalContent = content;
-            content = content.replace(/--- MCP TOOLS ---[\s\S]*?--- END MCP TOOLS ---\n?/g, '');
+            content = content.replace(/\n--- MCP TOOLS ---[\s\S]*?--- END MCP TOOLS ---\n?/g, '');
 
             // If MCP is configured and we have tools, add the new section
             if (mcpUrl && cachedToolsSection) {
@@ -314,33 +320,38 @@ function generateToolsSection(tools) {
  * Initializes the MCP session.
  */
 async function initMcpSession() {
-    if (isInitialized) return;
-    log(4, 'mcpPlugin: Initializing MCP session');
-    const initParams = {
-        protocolVersion: '2025-03-26', // Latest from spec; adjust if needed
-        capabilities: {
-            roots: { listChanged: false }, // Minimal; add more if client supports
-            sampling: {} // Declare if client uses sampling
-        },
-        clientInfo: {
-            name: 'GptChatClient',
-            version: '1.0.0'
+    if (initPromise) return initPromise;
+    initPromise = (async () => {
+        if (isInitialized) return;
+        log(4, 'mcpPlugin: Initializing MCP session');
+        const initParams = {
+            protocolVersion: '2025-03-26', // Latest from spec; adjust if needed
+            capabilities: {
+                roots: { listChanged: false }, // Minimal; add more if client supports
+                sampling: {} // Declare if client uses sampling
+            },
+            clientInfo: {
+                name: 'GptChatClient',
+                version: '1.0.0'
+            }
+        };
+        const initData = await sendMcpRequest('initialize', initParams, true); // No session for init
+        if (initData.protocolVersion !== '2025-03-26') {
+            throw new Error(`Protocol version mismatch: requested 2025-03-26, got ${initData.protocolVersion}`);
         }
-    };
-    const initData = await sendMcpRequest('initialize', initParams, true); // No session for init
-    if (initData.protocolVersion !== '2025-03-26') {
-        throw new Error(`Protocol version mismatch: requested 2025-03-26, got ${initData.protocolVersion}`);
-    }
-    log(4, 'mcpPlugin: Negotiated capabilities', initData.capabilities);
-    // Check if session_id was set from header
-    if (!mcpSessionId) {
-        throw new Error('No session ID returned in initialize response header');
-    }
-    localStorage.setItem(`gptChat_mcpSession_${mcpUrl}`, mcpSessionId);
-    // Send initialized notification
-    await sendMcpRequest('notifications/initialized', {}, false, true); // Notification: no id
-    isInitialized = true;
-    log(4, 'mcpPlugin: MCP session initialized', mcpSessionId);
+        log(4, 'mcpPlugin: Negotiated capabilities', initData.capabilities);
+        // Check if session_id was set from header
+        if (!mcpSessionId) {
+            throw new Error('No session ID returned in initialize response header');
+        }
+        localStorage.setItem(`gptChat_mcpSession_${mcpUrl}`, mcpSessionId);
+        // Send initialized notification
+        await sendMcpRequest('notifications/initialized', {}, false, true); // Notification: no id
+        isInitialized = true;
+        log(4, 'mcpPlugin: MCP session initialized', mcpSessionId);
+    })();
+    await initPromise;
+    initPromise = null; // Reset for future calls if needed
 }
 
 /**

@@ -5,7 +5,6 @@
 'use strict';
 
 import { log, triggerError } from '../utils/logger.js';
-import { hooks } from '../hooks.js';
 
 /**
  * @class SettingsPanel

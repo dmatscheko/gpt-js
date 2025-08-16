@@ -21,6 +21,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
     """
     Custom HTTP request handler to serve static files and the API configuration.
     """
+
     def log_message(self, format, *args):
         """Logs an HTTP request."""
         logging.info(f"WEB: {format % args}")
@@ -41,10 +42,12 @@ def run_file_server():
     """
     Runs the static file server.
     """
+
     class ReuseTCPServer(socketserver.TCPServer):
         """
         A TCP server that allows address reuse.
         """
+
         allow_reuse_address = True
 
     with ReuseTCPServer(("", 8000), CustomHandler) as server:

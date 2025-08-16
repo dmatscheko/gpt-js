@@ -251,6 +251,7 @@ a:hover {
     min-height: 200px;
     white-space: pre-wrap;
     overflow-wrap: break-word;
+    word-break: break-word;
 }
 #chat > .message {
     margin: 8px;

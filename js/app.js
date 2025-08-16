@@ -229,7 +229,7 @@ class App {
             this.ui.messageEl.style.height = 'auto';
         });
         this.ui.messageEl.addEventListener('keydown', event => {
-            if (event.keyCode === 13 && (event.shiftKey || event.ctrlKey || event.altKey)) { // TODO: change event.keyCode to something not deprecated
+            if (event.key === 'Enter' && (event.shiftKey || event.ctrlKey || event.altKey)) {
                 event.preventDefault();
                 this.ui.submitButton.click();
             }
@@ -399,10 +399,10 @@ class App {
             triggerError(error.message);
             const lastMessage = targetChatlog.getLastMessage();
             if (lastMessage.value === null) {
-                lastMessage.value = { role: 'assistant', content: `${error.message}` };
+                lastMessage.value = { role: 'assistant', content: `[Error: ${error.message}. Retry or check connection.]` };
                 hooks.afterMessageAdd.forEach(fn => fn(lastMessage));
             } else {
-                lastMessage.appendContent(`\n\n${error.message}`);
+                lastMessage.appendContent(`\n\n[Error: ${error.message}. Retry or check connection.]`);
             }
             lastMessage.cache = null;
         } finally {
