@@ -99,7 +99,15 @@
                     </div>
                     <div class="tab-pane" id="flow-tab-pane">
                         <div class="agents-flow-toolbar">
-                            <button id="add-flow-step-btn" class="agents-flow-btn">Add Step</button>
+                            <div class="dropdown">
+                                <button id="add-flow-step-btn-dropdown" class="agents-flow-btn">Add Step &#9662;</button>
+                                <div id="add-step-dropdown-content" class="dropdown-content">
+                                    <a href="#" data-step-type="agent">Agent Prompt</a>
+                                    <a href="#" data-step-type="conditional">Conditional</a>
+                                    <a href="#" data-step-type="multi">Multi-Message</a>
+                                    <a href="#" data-step-type="consolidator">Consolidator</a>
+                                </div>
+                            </div>
                             <button id="run-flow-btn" class="agents-flow-btn">Run Flow</button>
                         </div>
                         <div id="flow-canvas-wrapper">

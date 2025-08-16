@@ -334,6 +334,28 @@ class Chatlog {
      * Gets the last set of alternatives in the active path.
      * @returns {Alternatives | null} The last alternatives.
      */
+    getLastNMessages(n, role) {
+        log(5, `Chatlog: getLastNMessages called for n=${n}, role=${role}`);
+        let messages = [];
+        let current = this.rootAlternatives;
+        while (current) {
+            const activeMessage = current.getActiveMessage();
+            if (activeMessage) {
+                messages.push(activeMessage);
+                if (!activeMessage.answerAlternatives) break;
+                current = activeMessage.answerAlternatives;
+            } else {
+                break;
+            }
+        }
+
+        if (role) {
+            messages = messages.filter(msg => msg.value && msg.value.role === role);
+        }
+
+        return messages.slice(-n);
+    }
+
     getLastAlternatives() {
         log(5, 'Chatlog: getLastAlternatives called');
         let current = this.rootAlternatives;
