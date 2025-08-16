@@ -366,7 +366,7 @@ const agentsPlugin = {
         } else if (target.classList.contains('delete-connection-btn')) {
             const fromId = target.dataset.from;
             const toId = target.dataset.to;
-            if (fromId && toId && confirm('Are you sure you want to delete this connection?')) {
+            if (fromId && toId) {
                 chat.flow.connections = (chat.flow.connections || []).filter(c => !(c.from === fromId && c.to === toId));
                 chatModified = true;
             }
