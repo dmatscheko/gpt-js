@@ -315,52 +315,39 @@ function parseFunctionCalls(content) {
     log(5, 'mcpPlugin: parseFunctionCalls called');
     const toolCalls = [];
     const positions = [];
-    const fullRegex = /(<dma:function_call\s*[^>]*?\/>)|(<dma:function_call\s*[^>]*?>[\s\S]*?<\/dma:function_call\s*>)/gi;
+    const functionCallRegex = /<dma:function_call\s*([^>]*?)>([\s\S]*?)<\/dma:function_call\s*>|<dma:function_call\s*([^>]*?)\/>/gi;
+    const nameRegex = /name="([^"]*)"/;
+    const paramsRegex = /<parameter name="([^"]*)">([\s\S]*?)<\/parameter>/g;
+
     let match;
-    while ((match = fullRegex.exec(content)) !== null) {
-        let snippet;
-        if (match[1]) {
-            // Self-closing tag
-            snippet = match[1];
-        } else if (match[2]) {
-            // Non-self-closing tag
-            snippet = match[2];
-        } else {
-            continue;
-        }
+    while ((match = functionCallRegex.exec(content)) !== null) {
         const startIndex = match.index;
         const endIndex = startIndex + match[0].length;
 
-        // Wrap parameter content in CDATA to handle special characters like &
-        snippet = snippet.replace(/<parameter(.*?)>([\s\S]*?)<\/parameter>/gi, '<parameter$1><![CDATA[$2]]></parameter>');
+        const isSelfClosing = match[3] !== undefined;
+        const attributes = isSelfClosing ? match[3] : match[1];
+        const innerContent = isSelfClosing ? '' : match[2];
 
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(`<root>${snippet}</root>`, 'application/xml');
-        if (doc.documentElement.localName === 'parsererror') {
-            log(2, 'mcpPlugin: Invalid XML snippet in parseFunctionCalls');
-            continue;
-        }
-        const functionCallNode = doc.querySelector('dma\\:function_call');
-        if (functionCallNode) {
-            const name = functionCallNode.getAttribute('name');
-            const params = {};
-            functionCallNode.querySelectorAll('parameter').forEach(param => {
-                let value = '';
-                // Manually concatenate text nodes to avoid unexpected behavior from textContent
-                for (const node of param.childNodes) {
-                    if (node.nodeType === 3) { // Node.TEXT_NODE
-                        value += node.nodeValue;
-                    }
-                }
-                value = value.trim();
+        const nameMatch = attributes.match(nameRegex);
+        if (!nameMatch) continue;
+
+        const name = nameMatch[1];
+        const params = {};
+
+        if (!isSelfClosing) {
+            let paramMatch;
+            while ((paramMatch = paramsRegex.exec(innerContent)) !== null) {
+                let value = paramMatch[2].trim();
                 // Unescape escaped (not meant for execution) function calls.
                 value = value.replace(/<\\\/dma:function_call>/g, '</dma:function_call>').replace(/<\\\/parameter>/g, '</parameter>');
-                params[param.getAttribute('name')] = value;
-            });
-            toolCalls.push({ name, params });
-            positions.push({ start: startIndex, end: endIndex });
+                params[paramMatch[1]] = value;
+            }
         }
+
+        toolCalls.push({ name, params });
+        positions.push({ start: startIndex, end: endIndex });
     }
+
     log(4, 'mcpPlugin: Parsed tool calls', toolCalls.length);
     return { toolCalls, positions };
 }
