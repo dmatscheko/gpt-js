@@ -330,6 +330,10 @@ class Chatlog {
         return null;
     }
 
+    /**
+     * Gets the last set of alternatives in the active path.
+     * @returns {Alternatives | null} The last alternatives.
+     */
     getLastAlternatives() {
         log(5, 'Chatlog: getLastAlternatives called');
         let current = this.rootAlternatives;
