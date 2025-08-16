@@ -475,6 +475,7 @@ const agentsPlugin = {
         this.currentStepId = step.id;
         const chat = this.store.get('currentChat');
         const type = step.type || 'agent';
+        const chatlog = this.app.ui.chatBox.chatlog;
 
         switch (type) {
             case 'agent':
@@ -497,7 +498,6 @@ const agentsPlugin = {
                 chat.activeAgentId = step.agentId;
                 this.store.set('currentChat', { ...chat });
 
-                const chatlog = this.app.ui.chatBox.chatlog;
                 chatlog.addMessage({ role: 'user', content: step.prompt });
                 const assistantMessageToBranchFrom = chatlog.addMessage(null);
                 this.multiMessageInfo.messageToBranchFrom = assistantMessageToBranchFrom;
@@ -550,7 +550,6 @@ const agentsPlugin = {
                 }
                 break;
             case 'consolidator':
-                const chatlog = this.app.ui.chatBox.chatlog;
                 const activeMessages = chatlog.getActiveMessageValues().map((_, i) => chatlog.getNthMessage(i));
 
                 let sourceMessage = null;
