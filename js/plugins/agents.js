@@ -560,9 +560,15 @@ const agentsPlugin = {
                     return this.stopFlow('Invalid flow structure for Consolidator.');
                 }
 
-                const alternatives = sourceMessage.answerAlternatives.messages;
-                let consolidatedContent = alternatives.map((msg, i) => {
-                    return `--- ALTERNATIVE ${i + 1} ---\n${msg.value.content}`;
+                const consolidatedContent = sourceMessage.answerAlternatives.messages.map((alternativeStartMessage, i) => {
+                    let turnContent = '';
+                    let currentMessageInTurn = alternativeStartMessage;
+                    while (currentMessageInTurn) {
+                        const { role, content } = currentMessageInTurn.value;
+                        turnContent += `**${role.charAt(0).toUpperCase() + role.slice(1)}:**\n${content}\n\n`;
+                        currentMessageInTurn = currentMessageInTurn.getAnswerMessage();
+                    }
+                    return `--- ALTERNATIVE ${i + 1} ---\n${turnContent.trim()}`;
                 }).join('\n\n');
 
                 const finalPrompt = `${step.prePrompt || ''}\n\n${consolidatedContent}\n\n${step.postPrompt || ''}`;
