@@ -7,6 +7,7 @@
 import { log, triggerError } from '../utils/logger.js';
 import { hooks } from '../hooks.js';
 import { parseFunctionCalls } from '../utils/parsers.js';
+import { addAlternativeToChat } from '../utils/chat.js';
 
 const INTERACTIVE_TAGS = ['INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'BUTTON', 'LABEL'];
 
@@ -717,8 +718,7 @@ const agentsPlugin = {
 
                     // Add a new alternative to the same message that the first alternative branched from.
                     // This ensures all alternatives are siblings, regardless of tool calls in other branches.
-                    const newAlternative = chatlog.addAlternative(messageToBranchFrom, null);
-                    chatlog.notify(); // Ensure UI updates to show a new empty message
+                    addAlternativeToChat(chatlog, messageToBranchFrom, null);
 
                     // Now generate the response for the new empty alternative
                     agentsPlugin.app.generateAIResponse({}, chatlog);

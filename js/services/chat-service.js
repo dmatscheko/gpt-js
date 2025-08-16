@@ -7,7 +7,7 @@
 import { Chatlog, Alternatives } from '../components/chatlog.js';
 import { firstPrompt } from '../config.js';
 import { log, triggerError } from '../utils/logger.js';
-import { getDatePrompt, resetEditing } from '../utils/chat.js';
+import { getDatePrompt, resetEditing, addMessageToChat } from '../utils/chat.js';
 
 /**
  * @class ChatService
@@ -55,7 +55,7 @@ class ChatService {
         const id = Date.now().toString();
         const title = 'New Chat';
         const chatlog = new Chatlog();
-        chatlog.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
+        addMessageToChat(chatlog, { role: 'system', content: firstPrompt + getDatePrompt() });
         const newChat = { id, title, chatlog };
         this.chats.push(newChat);
         this.store.set('chats', this.chats);
@@ -173,7 +173,7 @@ class ChatService {
                     rootData = parsed.rootAlternatives;
                 } else {
                     const tempLog = new Chatlog();
-                    parsed.forEach(msg => tempLog.addMessage(msg));
+                    parsed.forEach(msg => addMessageToChat(tempLog, msg));
                     rootData = tempLog.toJSON();
                 }
                 const chatlog = new Chatlog();

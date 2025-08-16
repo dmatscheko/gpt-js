@@ -6,7 +6,7 @@
 
 import { triggerError, log } from '../utils/logger.js';
 import { createControlButton } from '../utils/ui.js';
-import { resetEditing } from '../utils/chat.js';
+import { resetEditing, addAlternativeToChat } from '../utils/chat.js';
 import { hooks } from '../hooks.js';
 
 /**
@@ -85,7 +85,7 @@ export const messageModificationPlugin = {
                     resetEditing(store, chatlog, chatbox);
                     if (message.value.role === 'assistant') {
                         // Regenerate AI message
-                        chatlog.addAlternative(message, { role: message.value.role, content: null });
+                        addAlternativeToChat(chatlog, message, { role: message.value.role, content: null });
                         hooks.onGenerateAIResponse.forEach(fn => fn({}, chatlog));
                     } else {
                         if (messageInput.value !== '' && messageInput.value !== message.value.content.trim()) {
@@ -95,7 +95,7 @@ export const messageModificationPlugin = {
                         // Add a new editable alternative for user/system/tool messages with placeholder
                         const pos = chatlog.getMessagePos(message);
                         const originalContent = message.value.content;
-                        chatlog.addAlternative(message, { role: message.value.role, content: null });
+                        addAlternativeToChat(chatlog, message, { role: message.value.role, content: null });
                         messageInput.value = originalContent ? originalContent.trim() : '';
                         messageInput.dispatchEvent(new Event('input', { bubbles: true }));
                         store.set('editingPos', pos);

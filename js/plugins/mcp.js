@@ -7,6 +7,7 @@
 import { log } from '../utils/logger.js';
 import { hooks } from '../hooks.js';
 import { parseFunctionCalls } from '../utils/parsers.js';
+import { addMessageToChat } from '../utils/chat.js';
 
 /**
  * The MCP server URL.
@@ -170,8 +171,6 @@ export const mcpPlugin = {
         onMessageComplete: function (message, chatlog, chatbox) {
             log(5, 'mcpPlugin: onMessageComplete called for role', message.value?.role);
             if (!message.value || message.value.role !== 'assistant') return;
-            const lastMessage = chatlog.getLastMessage();
-            if (message !== lastMessage) return;
             const { toolCalls, positions, isSelfClosings } = parseFunctionCalls(message.value.content);
             if (toolCalls.length > 0) {
                 log(3, 'mcpPlugin: Found tool calls', toolCalls.length);
@@ -246,10 +245,10 @@ export const mcpPlugin = {
                         toolContents += `<dma:tool_response name="${name}" tool_call_id="${id}">\n${inner}\n</dma:tool_response>\n`;
                     });
                     if (toolContents !== '') {
-                        chatlog.addMessage({ role: 'tool', content: toolContents });
+                        addMessageToChat(chatlog, { role: 'tool', content: toolContents });
                     }
                     // Auto-continue by streaming new assistant response.
-                    chatlog.addMessage(null); // Add placeholder for new response.
+                    addMessageToChat(chatlog, null); // Add placeholder for new response.
                     chatbox.update();
                     hooks.onGenerateAIResponse.forEach(fn => fn({}, chatlog));
                 });
