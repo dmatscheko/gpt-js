@@ -230,7 +230,7 @@ class App {
             this.ui.messageEl.style.height = 'auto';
         });
         this.ui.messageEl.addEventListener('keydown', event => {
-            if (event.keyCode === 13 && (event.shiftKey || event.ctrlKey || event.altKey)) {
+            if (event.keyCode === 13 && (event.shiftKey || event.ctrlKey || event.altKey)) { // TODO: change event.keyCode to something not deprecated
                 event.preventDefault();
                 this.ui.submitButton.click();
             }
@@ -419,6 +419,7 @@ class App {
      * @param {string} userRole - The role of the user.
      */
     async submitUserMessage(message, userRole) {
+        // TODO: submitUserMessage is called when a flow advances to the next step, and it sometimes even streams an AI response, but that is not visible. Only the first user message and response is visible.
         log(3, 'App: submitUserMessage called with role', userRole);
         const currentChatlog = this.chatService.getCurrentChatlog();
         if (!currentChatlog) return;

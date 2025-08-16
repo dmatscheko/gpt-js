@@ -204,7 +204,6 @@ const agentsPlugin = {
 
     // --- Event Handlers ---
     handleTabClick(e) {
-        log(5, 'handleTabClick...');
         if (e.target.classList.contains('tab-button')) {
             const tabName = e.target.dataset.tab;
             if (tabName === 'flow') {
@@ -230,7 +229,6 @@ const agentsPlugin = {
     },
 
     handleAgentListClick(e) {
-        log(5, 'handleAgentListClick...');
         const id = e.target.dataset.id;
         if (!id) return;
         const chat = this.store.get('currentChat');
@@ -267,7 +265,7 @@ const agentsPlugin = {
     },
 
     handleFlowCanvasClick(e) {
-        log(5, 'handleFlowCanvasClick...');
+        // TODO: it might be that this handler is responsible to clear the focus from the input elements of flow steps. that makes it very hard to write something into those input elements. Maybe the click needs to propagate?
         const target = e.target;
         const chat = this.store.get('currentChat');
         if (target.classList.contains('delete-flow-step-btn')) {
@@ -276,7 +274,7 @@ const agentsPlugin = {
             chat.flow.steps = chat.flow.steps.filter(s => s.id !== stepId);
             chat.flow.connections = (chat.flow.connections || []).filter(c => c.from !== stepId && c.to !== stepId);
         } else if (target.classList.contains('delete-connection-btn')) {
-            // TODO: this part does not work because the SVG elements are not clickable somehow. Maybe make a small button instead for the delete-connection-btn.
+            // TODO: this part is never called because the SVG elements are not clickable somehow. Maybe make a small button instead for the delete-connection-btn.
             const fromId = target.dataset.from;
             const toId = target.dataset.to;
             if (!fromId || !toId || !confirm('Are you sure you want to delete this connection?')) return;
@@ -286,7 +284,6 @@ const agentsPlugin = {
     },
 
     handleFlowCanvasMouseDown(e) {
-        log(5, 'handleFlowCanvasMouseDown...');
         const target = e.target;
         if (target.classList.contains('connector')) {
             this.connectionInfo.active = true;
@@ -329,7 +326,6 @@ const agentsPlugin = {
     },
 
     handleFlowCanvasMouseUp(e) {
-        log(5, 'handleFlowCanvasMouseUp...');
         if (this.dragInfo.active) {
             this.store.set('currentChat', { ...this.store.get('currentChat') });
         } else if (this.connectionInfo.active) {
@@ -358,7 +354,6 @@ const agentsPlugin = {
     },
 
     stopFlow(message = 'Flow stopped.') {
-        log(5, 'stopFlow...');
         this.flowRunning = false;
         this.currentStepId = null;
         this.updateRunButton(false);
@@ -371,8 +366,6 @@ const agentsPlugin = {
     },
 
     executeStep(step) {
-        log(5, 'executeStep...');
-        log(5, 'executeStep... flowRunning:', this.flowRunning);
         if (!this.flowRunning) return;
         if (this.stepCounter++ >= this.maxSteps) {
             triggerError('Flow execution stopped: Maximum step limit reached.');
@@ -389,7 +382,6 @@ const agentsPlugin = {
         const chat = this.store.get('currentChat');
         chat.activeAgentId = agentId;
         this.store.set('currentChat', { ...chat });
-        log(5, 'executeStep... should execute prompt:', prompt);
         this.app.submitUserMessage(prompt, 'user');
     },
 
@@ -418,7 +410,6 @@ const agentsPlugin = {
 
 // --- Hooks Definition ---
 agentsPlugin.hooks.onModifySystemPrompt = (systemContent) => {
-    log(5, 'onModifySystemPrompt...');
     const store = agentsPlugin.store;
     if (!store) return systemContent;
     let cleanedContent = systemContent
@@ -439,7 +430,6 @@ agentsPlugin.hooks.onModifySystemPrompt = (systemContent) => {
     return modified;
 };
 agentsPlugin.hooks.onMessageComplete = async (message, chatlog, chatbox) => {
-    log(5, 'onMessageComplete...');
     const app = agentsPlugin.app;
     const store = agentsPlugin.store;
     const currentChat = store.get('currentChat');
@@ -491,7 +481,6 @@ agentsPlugin.hooks.onMessageComplete = async (message, chatlog, chatbox) => {
 
     // Flow continuation logic
     if (agentsPlugin.flowRunning) {
-        log(5, 'onMessageComplete: Flow continuation logic...');
         const hasToolCalls = parseFunctionCalls(message.value.content).length > 0;
         if (!hasToolCalls) {
             const { steps, connections } = currentChat.flow;
@@ -502,8 +491,6 @@ agentsPlugin.hooks.onMessageComplete = async (message, chatlog, chatbox) => {
             } else {
                 agentsPlugin.stopFlow('Flow execution complete.');
             }
-        } else {
-             log(5, 'onMessageComplete: hasToolCalls: do not send message...');
         }
     }
 };

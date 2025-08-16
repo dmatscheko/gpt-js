@@ -1,18 +1,28 @@
 {
   "datetime": {
     "command": "uvx",
-    "args": ["fastmcp", "run", "./_mcp_servers/datetime-mcp/datetime-mcp.py"]
+    "args": [
+      "fastmcp",
+      "run",
+      "./_mcp_servers/datetime-mcp/datetime-mcp.py"
+    ]
   },
   "fetch": {
     "command": "uvx",
-    "args": ["fastmcp", "run", "./_mcp_servers/fetch-mcp/fetch-mcp.py"]
+    "args": [
+      "fastmcp",
+      "run",
+      "./_mcp_servers/fetch-mcp/fetch-mcp.py"
+    ]
   },
-  "weather": {
-    "url": "https://weather-api.example.com/mcp",
-    "transport": "http"
-  },
-  "calendar": {
-    "url": "https://calendar-api.example.com/mcp",
-    "transport": "http"
+  "filesystem": {
+    "command": "uvx",
+    "args": [
+      "fastmcp",
+      "run",
+      "./_mcp_servers/filesystem-mcp/filesystem-mcp.py",
+      "--",
+      "./_test/filesystem"
+    ]
   }
 }

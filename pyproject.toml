@@ -1,7 +1,7 @@
 [project]
 name = "gpt-js"
 version = "0.1.0"
-description = "Add your description here"
+description = "HTML/JS-based chat application"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
