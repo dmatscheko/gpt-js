@@ -94,7 +94,7 @@ function renderFlow(store) {
         switch (type) {
             case 'agent':
                 content = `
-                    <h4>Agent Prompt</h4>
+                    <h4>Prompt</h4>
                     <label>Agent:</label>
                     <select class="flow-step-agent flow-step-input" data-id="${step.id}"><option value="">Select Agent</option>${agentOptions}</select>
                     <label>Prompt:</label>
@@ -105,14 +105,12 @@ function renderFlow(store) {
                 content = `
                     <h4>Conditional</h4>
                     <label>Condition:</label>
-                    <div class="conditional-grid">
-                        <select class="flow-step-condition-type flow-step-input" data-id="${step.id}">
-                            <option value="contains" ${step.conditionType === 'contains' ? 'selected' : ''}>Contains String</option>
-                            <option value="matches" ${step.conditionType === 'matches' ? 'selected' : ''}>Matches String</option>
-                            <option value="regex" ${step.conditionType === 'regex' ? 'selected' : ''}>Matches Regex</option>
-                        </select>
-                        <input type="text" class="flow-step-condition flow-step-input" data-id="${step.id}" value="${step.condition || ''}" placeholder="Enter value...">
-                    </div>
+                    <select class="flow-step-condition-type flow-step-input" data-id="${step.id}">
+                        <option value="contains" ${step.conditionType === 'contains' ? 'selected' : ''}>Contains String</option>
+                        <option value="matches" ${step.conditionType === 'matches' ? 'selected' : ''}>Matches String</option>
+                        <option value="regex" ${step.conditionType === 'regex' ? 'selected' : ''}>Matches Regex</option>
+                    </select>
+                    <textarea class="flow-step-condition flow-step-input" rows="2" data-id="${step.id}" placeholder="Enter value...">${step.condition || ''}</textarea>
                     <label>On Match:</label>
                     <select class="flow-step-on-match flow-step-input" data-id="${step.id}">
                         <option value="stop" ${step.onMatch === 'stop' ? 'selected' : ''}>Stop flow</option>
@@ -122,7 +120,7 @@ function renderFlow(store) {
                 break;
             case 'multi':
                 content = `
-                    <h4>Multi-Message</h4>
+                    <h4>Multi-Prompt</h4>
                     <label>Agent:</label>
                     <select class="flow-step-agent flow-step-input" data-id="${step.id}"><option value="">Select Agent</option>${agentOptions}</select>
                     <label>Prompt:</label>

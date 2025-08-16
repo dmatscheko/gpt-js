@@ -183,12 +183,6 @@
     box-sizing: border-box;
 }
 
-.flow-step-card .conditional-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 5px;
-}
-
 .flow-step-card-buttons {
     margin-top: 10px;
 }
