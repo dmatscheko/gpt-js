@@ -99,7 +99,6 @@ class App {
 
         hooks.onSettingsRender.forEach(fn => fn(this.settingsPanel.ui.settingsEl));
 
-        window.addEventListener('beforeunload', () => this.chatService.persistChats());
         this.setUpEventListeners();
     }
 
