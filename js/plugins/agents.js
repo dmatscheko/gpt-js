@@ -197,7 +197,7 @@ const agentsPlugin = {
     maxSteps: 20,
     dragInfo: { active: false, target: null, offsetX: 0, offsetY: 0 },
     connectionInfo: { active: false, fromNode: null, fromConnector: null, tempLine: null },
-    multiMessageInfo: { active: false, step: null, counter: 0 },
+    multiMessageInfo: { active: false, step: null, counter: 0, firstAssistantMessage: null },
 
     init: function(app) {
         this.app = app;
@@ -454,6 +454,7 @@ const agentsPlugin = {
     stopFlow(message = 'Flow stopped.') {
         this.flowRunning = false;
         this.currentStepId = null;
+        this.multiMessageInfo = { active: false, step: null, counter: 0, firstAssistantMessage: null };
         this.updateRunButton(false);
         const chat = this.store.get('currentChat');
         if (chat) {
@@ -543,21 +544,24 @@ const agentsPlugin = {
                 }
                 break;
             case 'consolidator':
-                const incomingConnections = chat.flow.connections.filter(c => c.to === step.id);
-                if (incomingConnections.length !== 1) {
-                    triggerError(`Consolidator step must have exactly one incoming connection.`);
-                    return this.stopFlow('Invalid flow structure.');
-                }
-                const prevStep = chat.flow.steps.find(s => s.id === incomingConnections[0].from);
-                if (!prevStep || (prevStep.type !== 'multi' && prevStep.type !== 'agent')) { // Allow agent -> consolidator too
-                    triggerError(`Consolidator must be preceded by a Multi-Message or Agent Prompt step.`);
-                    return this.stopFlow('Invalid flow structure.');
+                const chatlog = this.app.ui.chatBox.chatlog;
+                const activeMessages = chatlog.getActiveMessageValues().map((_, i) => chatlog.getNthMessage(i));
+
+                let sourceMessage = null;
+                for (let i = activeMessages.length - 1; i >= 0; i--) {
+                    if (activeMessages[i] && activeMessages[i].answerAlternatives) {
+                        sourceMessage = activeMessages[i];
+                        break;
+                    }
                 }
 
-                const numMessagesToConsolidate = prevStep.type === 'multi' ? (prevStep.count || 1) : 1;
-                const messages = this.app.ui.chatBox.chatlog.getLastNMessages(numMessagesToConsolidate, 'assistant');
+                if (!sourceMessage) {
+                    triggerError(`Consolidator could not find a preceding step with alternatives.`);
+                    return this.stopFlow('Invalid flow structure for Consolidator.');
+                }
 
-                let consolidatedContent = messages.map((msg, i) => {
+                const alternatives = sourceMessage.answerAlternatives.messages;
+                let consolidatedContent = alternatives.map((msg, i) => {
                     return `--- ALTERNATIVE ${i + 1} ---\n${msg.value.content}`;
                 }).join('\n\n');
 
@@ -619,23 +623,32 @@ agentsPlugin.hooks.onMessageComplete = async (message, chatlog, chatbox) => {
     // --- Multi-Message Continuation ---
     if (agentsPlugin.flowRunning && agentsPlugin.multiMessageInfo.active) {
         const { step, counter } = agentsPlugin.multiMessageInfo;
+
+        if (counter === 1) {
+            // This is the first response, so we store it.
+            agentsPlugin.multiMessageInfo.firstAssistantMessage = message;
+        }
+
         if (counter < step.count) {
             agentsPlugin.multiMessageInfo.counter++;
             const chat = agentsPlugin.store.get('currentChat');
             chat.activeAgentId = step.agentId;
             agentsPlugin.store.set('currentChat', { ...chat });
-            // Manually add user message and trigger generation to create distinct history
+
             const chatlog = agentsPlugin.app.ui.chatBox.chatlog;
-            chatlog.addMessage({ role: 'user', content: step.prompt });
-            chatlog.addMessage(null);
-            chatlog.notify();
+            // By adding an alternative to the *first assistant message*, we are adding a new message
+            // to its parent `Alternatives` container. This correctly creates a new branch from the
+            // original user prompt for the AI to fill in.
+            const newAlternative = chatlog.addAlternative(agentsPlugin.multiMessageInfo.firstAssistantMessage, null);
+            chatlog.notify(); // Ensure UI updates to show a new empty message
+
+            // Now generate the response for the new empty alternative
             agentsPlugin.app.generateAIResponse({}, chatlog);
+
             return; // Stop further processing, let the multi-message loop continue
         } else {
             // Multi-message step is complete, reset and let the flow continue.
-            agentsPlugin.multiMessageInfo.active = false;
-            agentsPlugin.multiMessageInfo.step = null;
-            agentsPlugin.multiMessageInfo.counter = 0;
+            agentsPlugin.multiMessageInfo = { active: false, step: null, counter: 0, firstAssistantMessage: null };
         }
     }
 

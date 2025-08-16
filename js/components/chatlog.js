@@ -330,34 +330,6 @@ class Chatlog {
         return null;
     }
 
-    /**
-     * Gets the last N messages from the active path, optionally filtered by role.
-     * @param {number} n - The number of messages to get.
-     * @param {string} [role] - The role to filter by (e.g., 'assistant').
-     * @returns {Array<Message>} The last N messages.
-     */
-    getLastNMessages(n, role) {
-        log(5, `Chatlog: getLastNMessages called for n=${n}, role=${role}`);
-        let messages = [];
-        let current = this.rootAlternatives;
-        while (current) {
-            const activeMessage = current.getActiveMessage();
-            if (activeMessage) {
-                messages.push(activeMessage);
-                if (!activeMessage.answerAlternatives) break;
-                current = activeMessage.answerAlternatives;
-            } else {
-                break;
-            }
-        }
-
-        if (role) {
-            messages = messages.filter(msg => msg.value && msg.value.role === role);
-        }
-
-        return messages.slice(-n);
-    }
-
     getLastAlternatives() {
         log(5, 'Chatlog: getLastAlternatives called');
         let current = this.rootAlternatives;
