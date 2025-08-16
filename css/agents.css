@@ -148,6 +148,7 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
+    z-index: 1;
 }
 
 #flow-node-container {
@@ -156,6 +157,7 @@
     left: 0;
     width: 100%;
     height: 100%;
+    z-index: 2;
 }
 
 .flow-step-card {
@@ -259,6 +261,10 @@
 }
 
 /* --- Special Flow Step Styles --- */
+.flow-step-agent {
+    background-color: rgba(128, 128, 128, 0.2);
+}
+
 .flow-step-conditional {
     background-color: rgba(52, 152, 219, 0.2);
 }

@@ -353,7 +353,7 @@ const agentsPlugin = {
         const target = e.target;
 
         // Prevent interference with form elements inside a step card
-        if (target.closest('.flow-step-card') && ['TEXTAREA', 'SELECT', 'OPTION', 'LABEL'].includes(target.tagName)) {
+        if (target.closest('.flow-step-card') && ['INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'LABEL'].includes(target.tagName)) {
             return;
         }
 
