@@ -205,6 +205,77 @@ const agentsPlugin = {
         this.app = app;
         this.store = app.store;
 
+        // Dynamically add tabs
+        const tabs = document.getElementById('tabs');
+        const agentsTabButton = document.createElement('button');
+        agentsTabButton.classList.add('tab-button');
+        agentsTabButton.dataset.tab = 'agents';
+        agentsTabButton.textContent = 'Agents';
+        tabs.appendChild(agentsTabButton);
+
+        const flowTabButton = document.createElement('button');
+        flowTabButton.classList.add('tab-button');
+        flowTabButton.dataset.tab = 'flow';
+        flowTabButton.textContent = 'Flow';
+        tabs.appendChild(flowTabButton);
+
+        // Dynamically add tab panes
+        const tabContent = document.getElementById('tab-content');
+        const agentsTabPane = document.createElement('div');
+        agentsTabPane.classList.add('tab-pane');
+        agentsTabPane.id = 'agents-tab-pane';
+        agentsTabPane.innerHTML = `
+            <div class="agents-flow-toolbar">
+                <button id="add-agent-btn" class="agents-flow-btn">Add Agent</button>
+            </div>
+            <div id="agent-list"></div>
+            <div id="agent-form-container" style="display: none;">
+                <form id="agent-form">
+                    <input type="hidden" id="agent-id" value="">
+                    <label for="agent-name">Name:</label>
+                    <input type="text" id="agent-name" required>
+                    <label for="agent-description">Description:</label>
+                    <textarea id="agent-description" rows="2"></textarea>
+                    <label for="agent-system-prompt">System Prompt:</label>
+                    <textarea id="agent-system-prompt" rows="5"></textarea>
+                    <label>
+                        <input type="checkbox" id="agent-available-as-tool">
+                        Available as a tool
+                    </label>
+                    <div id="agent-form-buttons">
+                        <button type="submit" class="agents-flow-btn">Save Agent</button>
+                        <button type="button" id="cancel-agent-form" class="agents-flow-btn">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        `;
+        tabContent.appendChild(agentsTabPane);
+
+        const flowTabPane = document.createElement('div');
+        flowTabPane.classList.add('tab-pane');
+        flowTabPane.id = 'flow-tab-pane';
+        flowTabPane.innerHTML = `
+            <div class="agents-flow-toolbar">
+                <div class="dropdown">
+                    <button id="add-flow-step-btn-dropdown" class="agents-flow-btn">Add Step &#9662;</button>
+                    <div id="add-step-dropdown-content" class="dropdown-content">
+                        <a href="#" data-step-type="agent">Agent Prompt</a>
+                        <a href="#" data-step-type="conditional">Conditional</a>
+                        <a href="#" data-step-type="multi">Multi-Message</a>
+                        <a href="#" data-step-type="consolidator">Consolidator</a>
+                    </div>
+                </div>
+                <button id="run-flow-btn" class="agents-flow-btn">Run Flow</button>
+            </div>
+            <div id="flow-canvas-wrapper">
+                <div id="flow-canvas">
+                    <svg id="flow-svg-layer"></svg>
+                    <div id="flow-node-container"></div>
+                </div>
+            </div>
+        `;
+        tabContent.appendChild(flowTabPane);
+
         // --- Event Listeners ---
         // Tab switching
         document.getElementById('tabs').addEventListener('click', e => this.handleTabClick(e));
@@ -605,149 +676,153 @@ const agentsPlugin = {
         this.updateRunButton(true);
         this.executeStep(startingNodes[0]);
     },
+    getNextStep(stepId) {
+        const chat = this.store.get('currentChat');
+        const connection = chat.flow.connections.find(c => c.from === stepId);
+        return connection ? chat.flow.steps.find(s => s.id === connection.to) : null;
+    },
 
-    hooks: { /* ... */ }
-};
-
-// --- Hooks Definition ---
-agentsPlugin.hooks.onModifySystemPrompt = (systemContent) => {
-    const store = agentsPlugin.store;
-    if (!store) return systemContent;
-    let cleanedContent = systemContent
-        .replace(/--- AGENT DEFINITION ---[\s\S]*?--- END AGENT DEFINITION ---\n?/g, '')
-        .replace(/--- AVAILABLE AGENT TOOLS ---[\s\S]*?--- END AVAILABLE AGENT TOOLS ---\n?/g, '');
-    const chat = store.get('currentChat');
-    if (!chat || !chat.activeAgentId) return cleanedContent;
-    const agent = chat.agents.find(a => a.id === chat.activeAgentId);
-    if (!agent) return cleanedContent;
-    let modified = cleanedContent + `\n\n--- AGENT DEFINITION ---\n${agent.systemPrompt}\n--- END AGENT DEFINITION ---\n`;
-    const tools = chat.agents.filter(a => a.availableAsTool && a.id !== chat.activeAgentId);
-    if (tools.length > 0) {
-        modified += '\n--- AVAILABLE AGENT TOOLS ---\n';
-        tools.forEach(t => { modified += `- ${t.name}: ${t.description}\n`; });
-        modified += 'To call an agent tool, use: <dma:function_call name="agent_name_agent"><parameter name="prompt">...</parameter></dma:function_call>\n';
-        modified += '--- END AVAILABLE AGENT TOOLS ---\n';
-    }
-    return modified;
-};
-agentsPlugin.hooks.onMessageComplete = async (message, chatlog, chatbox) => {
-    if (message.value.role !== 'assistant') return;
-
-    // --- Multi-Message Continuation ---
-    if (agentsPlugin.flowRunning && agentsPlugin.multiMessageInfo.active) {
-        const { step, counter, messageToBranchFrom } = agentsPlugin.multiMessageInfo;
-
-        if (counter < step.count) {
-            agentsPlugin.multiMessageInfo.counter++;
-            const chat = agentsPlugin.store.get('currentChat');
-            chat.activeAgentId = step.agentId;
-            agentsPlugin.store.set('currentChat', { ...chat });
-
-            const chatlog = agentsPlugin.app.ui.chatBox.chatlog;
-            // Add a new alternative to the same message that the first alternative branched from.
-            // This ensures all alternatives are siblings, regardless of tool calls in other branches.
-            const newAlternative = chatlog.addAlternative(messageToBranchFrom, null);
-            chatlog.notify(); // Ensure UI updates to show a new empty message
-
-            // Now generate the response for the new empty alternative
-            agentsPlugin.app.generateAIResponse({}, chatlog);
-
-            return; // Stop further processing, let the multi-message loop continue
-        } else {
-            // Multi-message step is complete, reset and let the flow continue.
-            agentsPlugin.multiMessageInfo = { active: false, step: null, counter: 0, messageToBranchFrom: null };
-        }
-    }
-
-    const app = agentsPlugin.app;
-    const store = agentsPlugin.store;
-    const currentChat = store.get('currentChat');
-
-    // Parse the message content for any function calls once.
-    const { toolCalls } = parseFunctionCalls(message.value.content);
-
-    // Filter for agent-specific function calls.
-    const agentCalls = toolCalls.filter(call => call.name.endsWith('_agent'));
-
-    if (agentCalls.length > 0) {
-        // Assign unique IDs to each agent call for tracking.
-        agentCalls.forEach(call => {
-            call.id = `agent_call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        });
-
-        const toolResults = await Promise.all(agentCalls.map(async (call) => {
-            const agentToCall = currentChat.agents.find(a => `${a.name.toLowerCase().replace(/\s+/g, '_')}_agent` === call.name);
-
-            if (!agentToCall) {
-                return { id: call.id, error: `Agent "${call.name}" not found.` };
+    // --- Hooks Definition ---
+    hooks: {
+        onModifySystemPrompt: (systemContent) => {
+            const store = agentsPlugin.store;
+            if (!store) return systemContent;
+            let cleanedContent = systemContent
+                .replace(/\n\n--- AGENT DEFINITION ---[\s\S]*?--- END AGENT DEFINITION ---\n?/g, '')
+                .replace(/\n--- AVAILABLE AGENT TOOLS ---[\s\S]*?--- END AVAILABLE AGENT TOOLS ---\n?/g, '');
+            const chat = store.get('currentChat');
+            if (!chat || !chat.activeAgentId) return cleanedContent;
+            const agent = chat.agents.find(a => a.id === chat.activeAgentId);
+            if (!agent) return cleanedContent;
+            let modified = cleanedContent + `\n\n--- AGENT DEFINITION ---\n${agent.systemPrompt}\n--- END AGENT DEFINITION ---\n`;
+            const tools = chat.agents.filter(a => a.availableAsTool && a.id !== chat.activeAgentId);
+            if (tools.length > 0) {
+                modified += '\n--- AVAILABLE AGENT TOOLS ---\n';
+                tools.forEach(t => { modified += `- ${t.name}: ${t.description}\n`; });
+                modified += 'To call an agent tool, use: <dma:function_call name="agent_name_agent"><parameter name="prompt">...</parameter></dma:function_call>\n';
+                modified += '--- END AVAILABLE AGENT TOOLS ---\n';
             }
-            const prompt = call.params.prompt;
-            if (typeof prompt !== 'string') {
-                return { id: call.id, error: `Agent call to "${call.name}" is missing the "prompt" parameter.` };
-            }
+            return modified;
+        },
+        onMessageComplete: async (message, chatlog, chatbox) => {
+            if (message.value.role !== 'assistant') return;
 
-            const payload = {
-                model: app.configService.getModel() || document.querySelector('input[name="model"]:checked')?.value,
-                messages: [
-                    { role: 'system', content: agentToCall.systemPrompt },
-                    { role: 'user', content: prompt }
-                ],
-                temperature: Number(app.ui.temperatureEl.value),
-                top_p: Number(app.ui.topPEl.value),
-                stream: true
-            };
+            // --- Multi-Message Continuation ---
+            if (agentsPlugin.flowRunning && agentsPlugin.multiMessageInfo.active) {
+                const { step, counter, messageToBranchFrom } = agentsPlugin.multiMessageInfo;
 
-            try {
-                const reader = await app.apiService.streamAPIResponse(payload, app.configService.getEndpoint(), app.configService.getApiKey(), new AbortController().signal);
-                let responseContent = '';
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    const valueStr = new TextDecoder().decode(value);
-                    valueStr.split('\n').forEach(chunk => {
-                        if (chunk.startsWith('data: ')) {
-                            chunk = chunk.substring(6);
-                            if (chunk.trim() !== '[DONE]') {
-                                try {
-                                    responseContent += JSON.parse(chunk).choices[0]?.delta?.content || '';
-                                } catch (e) {
-                                    log(2, 'Error parsing agent response chunk', e);
-                                }
-                            }
-                        }
-                    });
+                if (counter < step.count) {
+                    agentsPlugin.multiMessageInfo.counter++;
+                    const chat = agentsPlugin.store.get('currentChat');
+                    chat.activeAgentId = step.agentId;
+                    agentsPlugin.store.set('currentChat', { ...chat });
+
+                    // Add a new alternative to the same message that the first alternative branched from.
+                    // This ensures all alternatives are siblings, regardless of tool calls in other branches.
+                    const newAlternative = chatlog.addAlternative(messageToBranchFrom, null);
+                    chatlog.notify(); // Ensure UI updates to show a new empty message
+
+                    // Now generate the response for the new empty alternative
+                    agentsPlugin.app.generateAIResponse({}, chatlog);
+
+                    return; // Stop further processing, let the multi-message loop continue
+                } else {
+                    // Multi-message step is complete, reset and let the flow continue.
+                    agentsPlugin.multiMessageInfo = { active: false, step: null, counter: 0, messageToBranchFrom: null };
                 }
-                return { id: call.id, content: responseContent };
-            } catch (error) {
-                log(1, 'Agent call failed', error);
-                return { id: call.id, error: error.message || 'Unknown error during agent execution.' };
             }
-        }));
 
-        let toolContents = '';
-        toolResults.forEach(tr => {
-            const inner = tr.error ? `<error>\n${escapeXml(tr.error)}\n</error>` : `<content>\n${escapeXml(tr.content)}\n</content>`;
-            toolContents += `<dma:tool_response tool_call_id="${tr.id}">\n${inner}\n</dma:tool_response>\n`;
-        });
+            const app = agentsPlugin.app;
+            const store = agentsPlugin.store;
+            const currentChat = store.get('currentChat');
 
-        if (toolContents) {
-            chatlog.addMessage({ role: 'tool', content: toolContents });
-            chatlog.addMessage(null);
-            chatbox.update();
-            hooks.onGenerateAIResponse.forEach(fn => fn({}, chatlog));
-        }
-        return; // Stop processing to prevent flow continuation.
-    }
+            // Parse the message content for any function calls once.
+            const { toolCalls } = parseFunctionCalls(message.value.content);
 
-    // Flow continuation logic: Only proceed if there are no tool calls of any kind.
-    if (agentsPlugin.flowRunning && toolCalls.length === 0) {
-        const { steps, connections } = currentChat.flow;
-        const nextConnection = connections.find(c => c.from === agentsPlugin.currentStepId);
-        const nextStep = nextConnection ? steps.find(s => s.id === nextConnection.to) : null;
-        if (nextStep) {
-            agentsPlugin.executeStep(nextStep);
-        } else {
-            agentsPlugin.stopFlow('Flow execution complete.');
+            // Filter for agent-specific function calls.
+            const agentCalls = toolCalls.filter(call => call.name.endsWith('_agent'));
+
+            if (agentCalls.length > 0) {
+                // Assign unique IDs to each agent call for tracking.
+                agentCalls.forEach(call => {
+                    call.id = `agent_call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+                });
+
+                const toolResults = await Promise.all(agentCalls.map(async (call) => {
+                    const agentToCall = currentChat.agents.find(a => `${a.name.toLowerCase().replace(/\s+/g, '_')}_agent` === call.name);
+
+                    if (!agentToCall) {
+                        return { id: call.id, error: `Agent "${call.name}" not found.` };
+                    }
+                    const prompt = call.params.prompt;
+                    if (typeof prompt !== 'string') {
+                        return { id: call.id, error: `Agent call to "${call.name}" is missing the "prompt" parameter.` };
+                    }
+
+                    const payload = {
+                        model: app.configService.getModel() || document.querySelector('input[name="model"]:checked')?.value,
+                        messages: [
+                            { role: 'system', content: agentToCall.systemPrompt },
+                            { role: 'user', content: prompt }
+                        ],
+                        temperature: Number(app.ui.temperatureEl.value),
+                        top_p: Number(app.ui.topPEl.value),
+                        stream: true
+                    };
+
+                    try {
+                        const reader = await app.apiService.streamAPIResponse(payload, app.configService.getEndpoint(), app.configService.getApiKey(), new AbortController().signal);
+                        let responseContent = '';
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            const valueStr = new TextDecoder().decode(value);
+                            valueStr.split('\n').forEach(chunk => {
+                                if (chunk.startsWith('data: ')) {
+                                    chunk = chunk.substring(6);
+                                    if (chunk.trim() !== '[DONE]') {
+                                        try {
+                                            responseContent += JSON.parse(chunk).choices[0]?.delta?.content || '';
+                                        } catch (e) {
+                                            log(2, 'Error parsing agent response chunk', e);
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        return { id: call.id, content: responseContent };
+                    } catch (error) {
+                        log(1, 'Agent call failed', error);
+                        return { id: call.id, error: error.message || 'Unknown error during agent execution.' };
+                    }
+                }));
+
+                let toolContents = '';
+                toolResults.forEach(tr => {
+                    const inner = tr.error ? `<error>\n${escapeXml(tr.error)}\n</error>` : `<content>\n${escapeXml(tr.content)}\n</content>`;
+                    toolContents += `<dma:tool_response tool_call_id="${tr.id}">\n${inner}\n</dma:tool_response>\n`;
+                });
+
+                if (toolContents) {
+                    chatlog.addMessage({ role: 'tool', content: toolContents });
+                    chatlog.addMessage(null);
+                    chatbox.update();
+                    hooks.onGenerateAIResponse.forEach(fn => fn({}, chatlog));
+                }
+                return; // Stop processing to prevent flow continuation.
+            }
+
+            // Flow continuation logic: Only proceed if there are no tool calls of any kind.
+            if (agentsPlugin.flowRunning && toolCalls.length === 0) {
+                const { steps, connections } = currentChat.flow;
+                const nextConnection = connections.find(c => c.from === agentsPlugin.currentStepId);
+                const nextStep = nextConnection ? steps.find(s => s.id === nextConnection.to) : null;
+                if (nextStep) {
+                    agentsPlugin.executeStep(nextStep);
+                } else {
+                    agentsPlugin.stopFlow('Flow execution complete.');
+                }
+            }
         }
     }
 };

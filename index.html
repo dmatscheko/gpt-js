@@ -50,8 +50,6 @@
             <div id="chatArea" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
                 <div id="tabs">
                     <button class="tab-button active" data-tab="chat">Chat</button>
-                    <button class="tab-button" data-tab="agents">Agents</button>
-                    <button class="tab-button" data-tab="flow">Flow</button>
                 </div>
                 <div id="tab-content">
                     <div class="tab-pane active" id="chat-tab-pane">
@@ -70,51 +68,6 @@
                                         fill="currentColor" />
                                 </svg>
                             </button>
-                        </div>
-                    </div>
-                    <div class="tab-pane" id="agents-tab-pane">
-                        <div class="agents-flow-toolbar">
-                            <button id="add-agent-btn" class="agents-flow-btn">Add Agent</button>
-                        </div>
-                        <div id="agent-list"></div>
-                        <div id="agent-form-container" style="display: none;">
-                            <form id="agent-form">
-                                <input type="hidden" id="agent-id" value="">
-                                <label for="agent-name">Name:</label>
-                                <input type="text" id="agent-name" required>
-                                <label for="agent-description">Description:</label>
-                                <textarea id="agent-description" rows="2"></textarea>
-                                <label for="agent-system-prompt">System Prompt:</label>
-                                <textarea id="agent-system-prompt" rows="5"></textarea>
-                                <label>
-                                    <input type="checkbox" id="agent-available-as-tool">
-                                    Available as a tool
-                                </label>
-                                <div id="agent-form-buttons">
-                                    <button type="submit" class="agents-flow-btn">Save Agent</button>
-                                    <button type="button" id="cancel-agent-form" class="agents-flow-btn">Cancel</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    <div class="tab-pane" id="flow-tab-pane">
-                        <div class="agents-flow-toolbar">
-                            <div class="dropdown">
-                                <button id="add-flow-step-btn-dropdown" class="agents-flow-btn">Add Step &#9662;</button>
-                                <div id="add-step-dropdown-content" class="dropdown-content">
-                                    <a href="#" data-step-type="agent">Agent Prompt</a>
-                                    <a href="#" data-step-type="conditional">Conditional</a>
-                                    <a href="#" data-step-type="multi">Multi-Message</a>
-                                    <a href="#" data-step-type="consolidator">Consolidator</a>
-                                </div>
-                            </div>
-                            <button id="run-flow-btn" class="agents-flow-btn">Run Flow</button>
-                        </div>
-                        <div id="flow-canvas-wrapper">
-                            <div id="flow-canvas">
-                                <svg id="flow-svg-layer"></svg>
-                                <div id="flow-node-container"></div>
-                            </div>
                         </div>
                     </div>
                 </div>

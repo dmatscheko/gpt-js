@@ -86,7 +86,6 @@ class App {
     async init() {
         log(3, 'App: init called');
         this.registerPlugins();
-        agentsPlugin.init(this);
         this.setupGlobalErrorHandlers();
 
         this.ui.chatBox.onUpdate = () => this.chatService.persistChats();
@@ -108,13 +107,13 @@ class App {
      * Registers all the plugins.
      */
     registerPlugins() {
-        registerPlugin(agentsPlugin);
-        registerPlugin(mcpPlugin);
-        formattingPlugins.forEach(registerPlugin);
-        registerPlugin(alternativeNavigationPlugin);
-        registerPlugin(messageModificationPlugin);
-        registerPlugin(avatarsPlugin);
-        registerPlugin(errorBubblePlugin);
+        registerPlugin(agentsPlugin, this);
+        registerPlugin(mcpPlugin, this);
+        formattingPlugins.forEach(plugin => registerPlugin(plugin, this));
+        registerPlugin(alternativeNavigationPlugin, this);
+        registerPlugin(messageModificationPlugin, this);
+        registerPlugin(avatarsPlugin, this);
+        registerPlugin(errorBubblePlugin, this);
     }
 
     /**
