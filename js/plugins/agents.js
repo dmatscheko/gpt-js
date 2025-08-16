@@ -706,8 +706,18 @@ const agentsPlugin = {
         onMessageComplete: async (message, chatlog, chatbox) => {
             if (message.value.role !== 'assistant') return;
 
+            // Parse the message content for any function calls once.
+            const { toolCalls } = parseFunctionCalls(message.value.content);
+
             // --- Multi-Message Continuation ---
             if (agentsPlugin.flowRunning && agentsPlugin.multiMessageInfo.active) {
+                // If the message contains tool calls, we must wait for them to complete.
+                // We'll return here and let the normal tool call process trigger a new `onMessageComplete`
+                // event once the tool results are in and a new assistant response is generated.
+                if (toolCalls.length > 0) {
+                    return;
+                }
+
                 const { step, counter, messageToBranchFrom } = agentsPlugin.multiMessageInfo;
 
                 if (counter < step.count) {
@@ -733,9 +743,6 @@ const agentsPlugin = {
             const app = agentsPlugin.app;
             const store = agentsPlugin.store;
             const currentChat = store.get('currentChat');
-
-            // Parse the message content for any function calls once.
-            const { toolCalls } = parseFunctionCalls(message.value.content);
 
             // Filter for agent-specific function calls.
             const agentCalls = toolCalls.filter(call => call.name.endsWith('_agent'));

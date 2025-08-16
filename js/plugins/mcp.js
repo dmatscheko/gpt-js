@@ -171,6 +171,8 @@ export const mcpPlugin = {
         onMessageComplete: function (message, chatlog, chatbox) {
             log(5, 'mcpPlugin: onMessageComplete called for role', message.value?.role);
             if (!message.value || message.value.role !== 'assistant') return;
+            const lastMessage = chatlog.getLastMessage();
+            if (message !== lastMessage) return;
             const { toolCalls, positions, isSelfClosings } = parseFunctionCalls(message.value.content);
             if (toolCalls.length > 0) {
                 log(3, 'mcpPlugin: Found tool calls', toolCalls.length);
