@@ -197,7 +197,7 @@ const agentsPlugin = {
     maxSteps: 20,
     dragInfo: { active: false, target: null, offsetX: 0, offsetY: 0 },
     connectionInfo: { active: false, fromNode: null, fromConnector: null, tempLine: null },
-    multiMessageInfo: { active: false, step: null, counter: 0, firstAssistantMessage: null },
+    multiMessageInfo: { active: false, step: null, counter: 0, messageToBranchFrom: null },
 
     init: function(app) {
         this.app = app;
@@ -454,7 +454,7 @@ const agentsPlugin = {
     stopFlow(message = 'Flow stopped.') {
         this.flowRunning = false;
         this.currentStepId = null;
-        this.multiMessageInfo = { active: false, step: null, counter: 0, firstAssistantMessage: null };
+        this.multiMessageInfo = { active: false, step: null, counter: 0, messageToBranchFrom: null };
         this.updateRunButton(false);
         const chat = this.store.get('currentChat');
         if (chat) {
@@ -496,7 +496,13 @@ const agentsPlugin = {
                 this.multiMessageInfo.counter = 1;
                 chat.activeAgentId = step.agentId;
                 this.store.set('currentChat', { ...chat });
-                this.app.submitUserMessage(step.prompt, 'user');
+
+                const chatlog = this.app.ui.chatBox.chatlog;
+                chatlog.addMessage({ role: 'user', content: step.prompt });
+                const assistantMessageToBranchFrom = chatlog.addMessage(null);
+                this.multiMessageInfo.messageToBranchFrom = assistantMessageToBranchFrom;
+
+                this.app.generateAIResponse({}, chatlog);
                 break;
             case 'conditional':
                 const lastMessage = this.app.ui.chatBox.chatlog.getLastMessage()?.value.content || '';
@@ -628,12 +634,7 @@ agentsPlugin.hooks.onMessageComplete = async (message, chatlog, chatbox) => {
 
     // --- Multi-Message Continuation ---
     if (agentsPlugin.flowRunning && agentsPlugin.multiMessageInfo.active) {
-        const { step, counter } = agentsPlugin.multiMessageInfo;
-
-        if (counter === 1) {
-            // This is the first response, so we store it.
-            agentsPlugin.multiMessageInfo.firstAssistantMessage = message;
-        }
+        const { step, counter, messageToBranchFrom } = agentsPlugin.multiMessageInfo;
 
         if (counter < step.count) {
             agentsPlugin.multiMessageInfo.counter++;
@@ -642,10 +643,9 @@ agentsPlugin.hooks.onMessageComplete = async (message, chatlog, chatbox) => {
             agentsPlugin.store.set('currentChat', { ...chat });
 
             const chatlog = agentsPlugin.app.ui.chatBox.chatlog;
-            // By adding an alternative to the *first assistant message*, we are adding a new message
-            // to its parent `Alternatives` container. This correctly creates a new branch from the
-            // original user prompt for the AI to fill in.
-            const newAlternative = chatlog.addAlternative(agentsPlugin.multiMessageInfo.firstAssistantMessage, null);
+            // Add a new alternative to the same message that the first alternative branched from.
+            // This ensures all alternatives are siblings, regardless of tool calls in other branches.
+            const newAlternative = chatlog.addAlternative(messageToBranchFrom, null);
             chatlog.notify(); // Ensure UI updates to show a new empty message
 
             // Now generate the response for the new empty alternative
@@ -654,7 +654,7 @@ agentsPlugin.hooks.onMessageComplete = async (message, chatlog, chatbox) => {
             return; // Stop further processing, let the multi-message loop continue
         } else {
             // Multi-message step is complete, reset and let the flow continue.
-            agentsPlugin.multiMessageInfo = { active: false, step: null, counter: 0, firstAssistantMessage: null };
+            agentsPlugin.multiMessageInfo = { active: false, step: null, counter: 0, messageToBranchFrom: null };
         }
     }
 
