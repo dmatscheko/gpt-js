@@ -330,6 +330,10 @@ function parseFunctionCalls(content) {
         }
         const startIndex = match.index;
         const endIndex = startIndex + match[0].length;
+
+        // Wrap parameter content in CDATA to handle special characters like &
+        snippet = snippet.replace(/<parameter(.*?)>([\s\S]*?)<\/parameter>/gi, '<parameter$1><![CDATA[$2]]></parameter>');
+
         const parser = new DOMParser();
         const doc = parser.parseFromString(`<root>${snippet}</root>`, 'application/xml');
         if (doc.documentElement.localName === 'parsererror') {
