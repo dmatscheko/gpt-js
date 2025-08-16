@@ -373,10 +373,13 @@ class App {
                 targetMessage.appendContent(delta);
                 targetChatlog.notify();
             }
+            // Set receiving to false before calling hooks, in case a hook triggers another generation
+            this.store.set('receiving', false);
             const lastMessage = targetChatlog.getLastMessage();
             hooks.onMessageComplete.forEach(fn => fn(lastMessage, targetChatlog, this.ui.chatBox));
 
         } catch (error) {
+            this.store.set('receiving', false); // Ensure receiving is false on error
             if (error.name === 'AbortError') {
                 log(3, 'App: Response aborted');
                 hooks.onCancel.forEach(fn => fn());
@@ -404,7 +407,6 @@ class App {
             }
             lastMessage.cache = null;
         } finally {
-            this.store.set('receiving', false);
             if (targetMessage.value !== null) {
                 targetMessage.metadata = { model, temperature, top_p: topP };
             }
