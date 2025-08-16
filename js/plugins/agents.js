@@ -641,9 +641,18 @@ const agentsPlugin = {
                     let turnContent = '';
                     let currentMessageInTurn = alternativeStartMessage;
                     while (currentMessageInTurn) {
-                        const { role, content } = currentMessageInTurn.value;
-                        turnContent += `**${role.charAt(0).toUpperCase() + role.slice(1)}:**\n${content}\n\n`;
-                        currentMessageInTurn = currentMessageInTurn.getAnswerMessage();
+                        if (currentMessageInTurn.value) {
+                            const { role, content } = currentMessageInTurn.value;
+                            turnContent += `**${role.charAt(0).toUpperCase() + role.slice(1)}:**\n${content}\n\n`;
+                        }
+
+                        if (currentMessageInTurn.answerAlternatives && currentMessageInTurn.answerAlternatives.messages.length > 0) {
+                            // In a non-branching chain (like agent-tool-agent), there should only be one message.
+                            // We assume the first message is the continuation of the chain.
+                            currentMessageInTurn = currentMessageInTurn.answerAlternatives.messages[0];
+                        } else {
+                            currentMessageInTurn = null;
+                        }
                     }
                     return `--- ALTERNATIVE ${i + 1} ---\n${turnContent.trim()}`;
                 }).join('\n\n');
