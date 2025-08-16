@@ -341,7 +341,14 @@ function parseFunctionCalls(content) {
             const name = functionCallNode.getAttribute('name');
             const params = {};
             functionCallNode.querySelectorAll('parameter').forEach(param => {
-                let value = param.textContent.trim();
+                let value = '';
+                // Manually concatenate text nodes to avoid unexpected behavior from textContent
+                for (const node of param.childNodes) {
+                    if (node.nodeType === 3) { // Node.TEXT_NODE
+                        value += node.nodeValue;
+                    }
+                }
+                value = value.trim();
                 // Unescape escaped (not meant for execution) function calls.
                 value = value.replace(/<\\\/dma:function_call>/g, '</dma:function_call>').replace(/<\\\/parameter>/g, '</parameter>');
                 params[param.getAttribute('name')] = value;
