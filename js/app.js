@@ -420,7 +420,8 @@ class App {
      */
     async submitUserMessage(message, userRole) {
         log(3, 'App: submitUserMessage called with role', userRole);
-        const currentChatlog = this.chatService.getCurrentChatlog();
+        // Ensure we are acting on the chatlog instance currently displayed in the UI
+        const currentChatlog = this.ui.chatBox.chatlog;
         if (!currentChatlog) return;
 
         const editedPos = this.store.get('editingPos');
@@ -446,7 +447,8 @@ class App {
         }
 
         if (!this.store.get('regenerateLastAnswer') && !message) return;
-        if (this.store.get('receiving') && !agentsPlugin.flowRunning) return; // Allow flow to submit messages
+        // Allow flow to submit messages even if another response is being generated
+        if (this.store.get('receiving') && !agentsPlugin.flowRunning) return;
 
         if (userRole === 'assistant') {
             let modifiedContent = message;
