@@ -6,40 +6,11 @@
 
 import { log, triggerError } from '../utils/logger.js';
 import { hooks } from '../hooks.js';
+import { parseFunctionCalls } from '../utils/parsers.js';
 
 // --- Helper Functions ---
 function escapeXml(unsafe) {
     return unsafe.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','\'':'&apos;','"':'&quot;'})[c]);
-}
-
-function parseFunctionCalls(content) {
-    const toolCalls = [];
-    // This regex now captures any function call, not just agents
-    const fullRegex = /(<dma:function_call[^>]*?\/>)|(<dma:function_call[^>]*?>[\s\S]*?<\/dma:function_call\s*>)/gi;
-    let match;
-    while ((match = fullRegex.exec(content)) !== null) {
-        toolCalls.push(match[0]); // Just need to know if any exist
-    }
-    return toolCalls;
-}
-
-function parseAgentCalls(content) {
-    const agentCalls = [];
-    const fullRegex = /(<dma:function_call[^>]*?name="(\w+)_agent"[^>]*?\/>)|(<dma:function_call[^>]*?name="(\w+)_agent"[^>]*?>[\s\S]*?<\/dma:function_call\s*>)/gi;
-    let match;
-    while ((match = fullRegex.exec(content)) !== null) {
-        const snippet = match[1] || match[3];
-        const agentName = match[2] || match[4];
-        const parser = new DOMParser(); // TODO: replace DOMParser like in mcp.js, because that does not work
-        const doc = parser.parseFromString(`<root>${snippet}</root>`, 'application/xml');
-        const functionCallNode = doc.querySelector('dma\\:function_call');
-        if (functionCallNode) {
-            const promptNode = functionCallNode.querySelector('parameter[name="prompt"]');
-            const prompt = promptNode ? promptNode.textContent.trim() : '';
-            agentCalls.push({ agentName, prompt, callId: `agent_call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}` });
-        }
-    }
-    return agentCalls;
 }
 
 // --- UI Rendering Functions ---
@@ -447,67 +418,97 @@ agentsPlugin.hooks.onModifySystemPrompt = (systemContent) => {
     return modified;
 };
 agentsPlugin.hooks.onMessageComplete = async (message, chatlog, chatbox) => {
+    if (message.value.role !== 'assistant') return;
+
     const app = agentsPlugin.app;
     const store = agentsPlugin.store;
     const currentChat = store.get('currentChat');
 
-    // Agent-to-agent calls
-    if (message.value.role === 'assistant') {
-        const agentCalls = parseAgentCalls(message.value.content);
-        if (agentCalls.length > 0) {
-            const toolResults = await Promise.all(agentCalls.map(async (call) => {
-                const agentToCall = currentChat.agents.find(a => a.name.toLowerCase().replace(/\s+/g, '_') === call.agentName);
-                if (!agentToCall) return { id: call.callId, error: `Agent "${call.agentName}" not found.` };
-                const payload = { model: app.configService.getModel() || document.querySelector('input[name="model"]:checked')?.value, messages: [{ role: 'system', content: agentToCall.systemPrompt }, { role: 'user', content: call.prompt }], temperature: Number(app.ui.temperatureEl.value), top_p: Number(app.ui.topPEl.value), stream: true };
-                try {
-                    const reader = await app.apiService.streamAPIResponse(payload, app.configService.getEndpoint(), app.configService.getApiKey(), new AbortController().signal);
-                    let responseContent = '';
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        const valueStr = new TextDecoder().decode(value);
-                        valueStr.split('\n').forEach(chunk => {
-                            if (chunk.startsWith('data: ')) {
-                                chunk = chunk.substring(6);
-                                if (chunk.trim() !== '[DONE]') {
-                                    try { responseContent += JSON.parse(chunk).choices[0]?.delta?.content || ''; } catch (e) { log(2, 'Error parsing agent response chunk', e); }
+    // Parse the message content for any function calls once.
+    const { toolCalls } = parseFunctionCalls(message.value.content);
+
+    // Filter for agent-specific function calls.
+    const agentCalls = toolCalls.filter(call => call.name.endsWith('_agent'));
+
+    if (agentCalls.length > 0) {
+        // Assign unique IDs to each agent call for tracking.
+        agentCalls.forEach(call => {
+            call.id = `agent_call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        });
+
+        const toolResults = await Promise.all(agentCalls.map(async (call) => {
+            const agentToCall = currentChat.agents.find(a => `${a.name.toLowerCase().replace(/\s+/g, '_')}_agent` === call.name);
+
+            if (!agentToCall) {
+                return { id: call.id, error: `Agent "${call.name}" not found.` };
+            }
+            const prompt = call.params.prompt;
+            if (typeof prompt !== 'string') {
+                return { id: call.id, error: `Agent call to "${call.name}" is missing the "prompt" parameter.` };
+            }
+
+            const payload = {
+                model: app.configService.getModel() || document.querySelector('input[name="model"]:checked')?.value,
+                messages: [
+                    { role: 'system', content: agentToCall.systemPrompt },
+                    { role: 'user', content: prompt }
+                ],
+                temperature: Number(app.ui.temperatureEl.value),
+                top_p: Number(app.ui.topPEl.value),
+                stream: true
+            };
+
+            try {
+                const reader = await app.apiService.streamAPIResponse(payload, app.configService.getEndpoint(), app.configService.getApiKey(), new AbortController().signal);
+                let responseContent = '';
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const valueStr = new TextDecoder().decode(value);
+                    valueStr.split('\n').forEach(chunk => {
+                        if (chunk.startsWith('data: ')) {
+                            chunk = chunk.substring(6);
+                            if (chunk.trim() !== '[DONE]') {
+                                try {
+                                    responseContent += JSON.parse(chunk).choices[0]?.delta?.content || '';
+                                } catch (e) {
+                                    log(2, 'Error parsing agent response chunk', e);
                                 }
                             }
-                        });
-                    }
-                    return { id: call.callId, content: responseContent };
-                } catch (error) {
-                    log(1, 'Agent call failed', error);
-                    return { id: call.callId, error: error.message || 'Unknown error during agent execution.' };
+                        }
+                    });
                 }
-            }));
-            let toolContents = '';
-            toolResults.forEach(tr => {
-                const inner = tr.error ? `<error>\n${escapeXml(tr.error)}\n</error>` : `<content>\n${escapeXml(tr.content)}\n</content>`;
-                toolContents += `<dma:tool_response tool_call_id="${tr.id}">\n${inner}\n</dma:tool_response>\n`;
-            });
-            if (toolContents) {
-                chatlog.addMessage({ role: 'tool', content: toolContents });
-                chatlog.addMessage(null);
-                chatbox.update();
-                hooks.onGenerateAIResponse.forEach(fn => fn({}, chatlog));
+                return { id: call.id, content: responseContent };
+            } catch (error) {
+                log(1, 'Agent call failed', error);
+                return { id: call.id, error: error.message || 'Unknown error during agent execution.' };
             }
-            return; // Important: Stop processing so we don't trigger flow continuation
+        }));
+
+        let toolContents = '';
+        toolResults.forEach(tr => {
+            const inner = tr.error ? `<error>\n${escapeXml(tr.error)}\n</error>` : `<content>\n${escapeXml(tr.content)}\n</content>`;
+            toolContents += `<dma:tool_response tool_call_id="${tr.id}">\n${inner}\n</dma:tool_response>\n`;
+        });
+
+        if (toolContents) {
+            chatlog.addMessage({ role: 'tool', content: toolContents });
+            chatlog.addMessage(null);
+            chatbox.update();
+            hooks.onGenerateAIResponse.forEach(fn => fn({}, chatlog));
         }
+        return; // Stop processing to prevent flow continuation.
     }
 
-    // Flow continuation logic
-    if (agentsPlugin.flowRunning) {
-        const hasToolCalls = parseFunctionCalls(message.value.content).length > 0;
-        if (!hasToolCalls) {
-            const { steps, connections } = currentChat.flow;
-            const nextConnection = connections.find(c => c.from === agentsPlugin.currentStepId);
-            const nextStep = nextConnection ? steps.find(s => s.id === nextConnection.to) : null;
-            if (nextStep) {
-                agentsPlugin.executeStep(nextStep);
-            } else {
-                agentsPlugin.stopFlow('Flow execution complete.');
-            }
+    // Flow continuation logic: Only proceed if there are no tool calls of any kind.
+    if (agentsPlugin.flowRunning && toolCalls.length === 0) {
+        const { steps, connections } = currentChat.flow;
+        const nextConnection = connections.find(c => c.from === agentsPlugin.currentStepId);
+        const nextStep = nextConnection ? steps.find(s => s.id === nextConnection.to) : null;
+        if (nextStep) {
+            agentsPlugin.executeStep(nextStep);
+        } else {
+            agentsPlugin.stopFlow('Flow execution complete.');
         }
     }
 };
