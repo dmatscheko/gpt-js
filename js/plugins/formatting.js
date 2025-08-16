@@ -58,8 +58,31 @@ export const formattingPlugins = [
             onFormatContent: function (text) {
                 log(5, 'formattingPlugins: think onFormatContent called');
                 text = text.replace(/<think>([\s\S]*?)<\/think>/g, '<details class="think"><summary>Thinking</summary><div class="think-content">$1</div></details>');
-                // Unmatched <think> at the end with open details.
+                // Unmatched <think> at theend with open details.
                 text = text.replace(/<think>([\s\S]*)$/, '<details open class="think"><summary>Thinking</summary><div class="think-content">$1</div></details>');
+                return text;
+            }
+        }
+    },
+    {
+        name: 'details_tags',
+        hooks: {
+            /**
+             * Handles custom collapsible sections.
+             * @param {string} text - The text content to format.
+             * @returns {string} The formatted text.
+             */
+            onFormatContent: function (text) {
+                log(5, 'formattingPlugins: details_tags onFormatContent called');
+                // Wrap system prompt sections in <details>
+                text = text.replace(/\\n--- (.*?) ---\\n([\\s\\S]*?)\\n--- END \\1 ---\\n/g, (match, title, content) => {
+                    return `\\n<details class="system-prompt-section"><summary>${title}</summary><div class="system-prompt-content">\\n--- ${title} ---\\n${content}\\n--- END ${title} ---</div></details>`;
+                });
+
+                // Wrap tool calls in <details>
+                text = text.replace(/\u25d9tool_code\\n([\s\S]*?)\u25e8/g, (match, content) => {
+                    return `<details class="tool-call"><summary>Tool Call</summary><div class="tool-call-content">\u25d9tool_code\\n${content}\u25e8</div></details>`;
+                });
                 return text;
             }
         }
