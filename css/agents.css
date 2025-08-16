@@ -262,17 +262,17 @@
 
 /* --- Special Flow Step Styles --- */
 .flow-step-agent {
-    background-color: rgba(128, 128, 128, 0.2);
+    background-color: hsla(0, 0%, 35%, 0.8);
 }
 
 .flow-step-conditional {
-    background-color: rgba(52, 152, 219, 0.2);
+    background-color: hsla(200, 20%, 35%, 0.8);
 }
 
 .flow-step-multi {
-    background-color: rgba(46, 204, 113, 0.2);
+    background-color: hsla(145, 20%, 35%, 0.8);
 }
 
 .flow-step-consolidator {
-    background-color: rgba(155, 89, 182, 0.2);
+    background-color: hsla(280, 20%, 35%, 0.8);
 }

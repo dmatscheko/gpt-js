@@ -8,6 +8,8 @@ import { log, triggerError } from '../utils/logger.js';
 import { hooks } from '../hooks.js';
 import { parseFunctionCalls } from '../utils/parsers.js';
 
+const INTERACTIVE_TAGS = ['INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'BUTTON', 'LABEL'];
+
 // --- Helper Functions ---
 function escapeXml(unsafe) {
     return unsafe.replace(/[<>&'"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','\'':'&apos;','"':'&quot;'})[c]);
@@ -351,12 +353,6 @@ const agentsPlugin = {
 
     handleFlowCanvasClick(e) {
         const target = e.target;
-
-        // Prevent interference with form elements inside a step card
-        if (target.closest('.flow-step-card') && ['INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'LABEL'].includes(target.tagName)) {
-            return;
-        }
-
         const chat = this.store.get('currentChat');
         let chatModified = false;
 
@@ -383,6 +379,12 @@ const agentsPlugin = {
 
     handleFlowCanvasMouseDown(e) {
         const target = e.target;
+
+        // Prevent interference with form elements inside a step card
+        if (target.closest('.flow-step-card') && INTERACTIVE_TAGS.includes(target.tagName)) {
+            return;
+        }
+
         if (target.classList.contains('connector')) {
             this.connectionInfo.active = true;
             this.connectionInfo.fromNode = target.closest('.flow-step-card');
@@ -392,7 +394,7 @@ const agentsPlugin = {
             line.setAttribute('stroke-width', '2');
             this.connectionInfo.tempLine = line;
             document.getElementById('flow-svg-layer').appendChild(line);
-        } else if (target.closest('.flow-step-card') && !['SELECT', 'TEXTAREA', 'BUTTON'].includes(target.tagName)) {
+        } else if (target.closest('.flow-step-card') && !INTERACTIVE_TAGS.includes(target.tagName)) {
             e.preventDefault();
             this.dragInfo.active = true;
             this.dragInfo.target = target.closest('.flow-step-card');
