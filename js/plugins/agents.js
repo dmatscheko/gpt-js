@@ -626,8 +626,9 @@ const agentsPlugin = {
 
                 let sourceMessage = null;
                 for (let i = activeMessages.length - 1; i >= 0; i--) {
-                    if (activeMessages[i] && activeMessages[i].answerAlternatives) {
-                        sourceMessage = activeMessages[i];
+                    const msg = activeMessages[i];
+                    if (msg && msg.answerAlternatives && msg.answerAlternatives.messages.length > 1) {
+                        sourceMessage = msg;
                         break;
                     }
                 }
