@@ -30,7 +30,7 @@ function parseAgentCalls(content) {
     while ((match = fullRegex.exec(content)) !== null) {
         const snippet = match[1] || match[3];
         const agentName = match[2] || match[4];
-        const parser = new DOMParser();
+        const parser = new DOMParser(); // TODO: replace DOMParser like in mcp.js, because that does not work
         const doc = parser.parseFromString(`<root>${snippet}</root>`, 'application/xml');
         const functionCallNode = doc.querySelector('dma\\:function_call');
         if (functionCallNode) {

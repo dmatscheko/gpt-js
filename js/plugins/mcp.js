@@ -165,7 +165,7 @@ export const mcpPlugin = {
             if (!message.value || message.value.role !== 'assistant') return;
             const lastMessage = chatlog.getLastMessage();
             if (message !== lastMessage) return;
-            const { toolCalls, positions } = parseFunctionCalls(message.value.content);
+            const { toolCalls, positions, isSelfClosings } = parseFunctionCalls(message.value.content);
             if (toolCalls.length > 0) {
                 log(3, 'mcpPlugin: Found tool calls', toolCalls.length);
                 toolCalls.forEach((tc, index) => {
@@ -181,7 +181,9 @@ export const mcpPlugin = {
                     startTag = startTag.replace(/\s+tool_call_id\s*=\s*["'][^"']*["']/g, '');
                     // Insert new tool_call_id
                     const insert = ` tool_call_id="${toolCalls[i].id}"`;
-                    startTag = startTag.slice(0, -1) + insert + '>';
+                    const endSlice = isSelfClosings[i] ? -2 : -1;
+                    const endTag = isSelfClosings[i] ? '/>' : '>';
+                    startTag = startTag.slice(0, endSlice) + insert + endTag;
                     content = content.slice(0, pos.start) + startTag + content.slice(gtIndex + 1);
                 }
                 message.value.content = content;
@@ -227,13 +229,14 @@ export const mcpPlugin = {
                     let toolContents = '';
                     toolResults.forEach((tr, index) => {
                         const id = toolCalls[index].id;
+                        const name = toolCalls[index].name;
                         let inner = '';
                         if (tr.error) {
                             inner = `<error>\n${escapeXml(tr.error)}\n</error>`;
                         } else {
                             inner = `<content>\n${escapeXml(tr.content)}\n</content>`;
                         }
-                        toolContents += `<dma:tool_response tool_call_id="${id}">\n${inner}\n</dma:tool_response>\n`;
+                        toolContents += `<dma:tool_response name="${name}" tool_call_id="${id}">\n${inner}\n</dma:tool_response>\n`;
                     });
                     if (toolContents !== '') {
                         chatlog.addMessage({ role: 'tool', content: toolContents });
@@ -309,47 +312,51 @@ function generateToolsSection(tools) {
 /**
  * Parses <dma:function_call> tags and extracts tool calls.
  * @param {string} content - The content to parse.
- * @returns {{toolCalls: Object[], positions: Object[]}} The parsed tool calls and their positions.
+ * @returns {{toolCalls: Object[], positions: Object[], isSelfClosings: boolean[]}} The parsed tool calls, their positions, and self-closing flags.
  */
 function parseFunctionCalls(content) {
     log(5, 'mcpPlugin: parseFunctionCalls called');
     const toolCalls = [];
     const positions = [];
-    const functionCallRegex = /<dma:function_call\s*([^>]*?)>([\s\S]*?)<\/dma:function_call\s*>|<dma:function_call\s*([^>]*?)\/>/gi;
+    const isSelfClosings = [];
+    const functionCallRegex = /<dma:function_call\s*([^>]+?)\/>|<dma:function_call\s*([^>]*?)>([\s\S]*?)<\/dma:function_call\s*>/gi;
     const nameRegex = /name="([^"]*)"/;
-    const paramsRegex = /<parameter name="([^"]*)">([\s\S]*?)<\/parameter>/g;
+    const paramsRegex = /<parameter\s+name="([^"]*)">([\s\S]*?)<\/parameter>/g;
 
-    let match;
-    while ((match = functionCallRegex.exec(content)) !== null) {
+    for (const match of content.matchAll(functionCallRegex)) {
         const startIndex = match.index;
         const endIndex = startIndex + match[0].length;
 
-        const isSelfClosing = match[3] !== undefined;
-        const attributes = isSelfClosing ? match[3] : match[1];
-        const innerContent = isSelfClosing ? '' : match[2];
+        const [, selfAttrs, openAttrs, innerContent] = match;
 
-        const nameMatch = attributes.match(nameRegex);
+        const isSelfClosing = innerContent === undefined;
+        const attributes = isSelfClosing ? selfAttrs : openAttrs;
+        const contentInner = isSelfClosing ? '' : innerContent;
+
+        const nameMatch = nameRegex.exec(attributes);
         if (!nameMatch) continue;
 
-        const name = nameMatch[1];
+        const [, name] = nameMatch;
         const params = {};
 
         if (!isSelfClosing) {
             let paramMatch;
-            while ((paramMatch = paramsRegex.exec(innerContent)) !== null) {
-                let value = paramMatch[2].trim();
-                // Unescape escaped (not meant for execution) function calls.
+            while ((paramMatch = paramsRegex.exec(contentInner)) !== null) {
+                const [, paramName, paramValue] = paramMatch;
+                let value = paramValue.trim();
                 value = value.replace(/<\\\/dma:function_call>/g, '</dma:function_call>').replace(/<\\\/parameter>/g, '</parameter>');
-                params[paramMatch[1]] = value;
+                params[paramName] = value;
+                log(5, "mcpPlugin: parseFunctionCalls value", value);
             }
         }
 
         toolCalls.push({ name, params });
         positions.push({ start: startIndex, end: endIndex });
+        isSelfClosings.push(isSelfClosing);
     }
 
     log(4, 'mcpPlugin: Parsed tool calls', toolCalls.length);
-    return { toolCalls, positions };
+    return { toolCalls, positions, isSelfClosings };
 }
 
 /**
