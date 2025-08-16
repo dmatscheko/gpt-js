@@ -87,42 +87,57 @@ function renderFlow(store) {
         node.style.top = `${step.y}px`;
         let content = '';
         const type = step.type || 'agent'; // Default to agent for old steps
+        const agentOptions = (chat.agents || []).map(a => `<option value="${a.id}" ${step.agentId === a.id ? 'selected' : ''}>${a.name}</option>`).join('');
 
         switch (type) {
             case 'agent':
-                const agentOptions = (chat.agents || []).map(a => `<option value="${a.id}" ${step.agentId === a.id ? 'selected' : ''}>${a.name}</option>`).join('');
                 content = `
                     <h4>Agent Prompt</h4>
                     <label>Agent:</label>
-                    <select class="flow-step-agent" data-id="${step.id}"><option value="">Select Agent</option>${agentOptions}</select>
+                    <select class="flow-step-agent flow-step-input" data-id="${step.id}"><option value="">Select Agent</option>${agentOptions}</select>
                     <label>Prompt:</label>
-                    <textarea class="flow-step-prompt" rows="3" data-id="${step.id}">${step.prompt || ''}</textarea>
+                    <textarea class="flow-step-prompt flow-step-input" rows="3" data-id="${step.id}">${step.prompt || ''}</textarea>
                 `;
                 break;
             case 'conditional':
                 content = `
                     <h4>Conditional</h4>
-                    <label>If last response contains:</label>
-                    <input type="text" class="flow-step-condition" data-id="${step.id}" value="${step.condition || ''}" placeholder="Enter text or /regex/">
-                    <label><input type="checkbox" class="flow-step-stop-on-match" data-id="${step.id}" ${step.stopOnMatch ? 'checked' : ''}> Stop flow on match</label>
+                    <label>Condition:</label>
+                    <div class="conditional-grid">
+                        <select class="flow-step-condition-type flow-step-input" data-id="${step.id}">
+                            <option value="contains" ${step.conditionType === 'contains' ? 'selected' : ''}>Contains String</option>
+                            <option value="matches" ${step.conditionType === 'matches' ? 'selected' : ''}>Matches String</option>
+                            <option value="regex" ${step.conditionType === 'regex' ? 'selected' : ''}>Matches Regex</option>
+                        </select>
+                        <input type="text" class="flow-step-condition flow-step-input" data-id="${step.id}" value="${step.condition || ''}" placeholder="Enter value...">
+                    </div>
+                    <label>On Match:</label>
+                    <select class="flow-step-on-match flow-step-input" data-id="${step.id}">
+                        <option value="stop" ${step.onMatch === 'stop' ? 'selected' : ''}>Stop flow</option>
+                        <option value="continue" ${step.onMatch === 'continue' ? 'selected' : ''}>Must match to continue</option>
+                    </select>
                 `;
                 break;
             case 'multi':
                 content = `
                     <h4>Multi-Message</h4>
+                    <label>Agent:</label>
+                    <select class="flow-step-agent flow-step-input" data-id="${step.id}"><option value="">Select Agent</option>${agentOptions}</select>
                     <label>Prompt:</label>
-                    <textarea class="flow-step-prompt" rows="3" data-id="${step.id}">${step.prompt || ''}</textarea>
+                    <textarea class="flow-step-prompt flow-step-input" rows="3" data-id="${step.id}">${step.prompt || ''}</textarea>
                     <label>Number of alternatives:</label>
-                    <input type="number" class="flow-step-count" data-id="${step.id}" value="${step.count || 1}" min="1" max="10">
+                    <input type="number" class="flow-step-count flow-step-input" data-id="${step.id}" value="${step.count || 1}" min="1" max="10">
                 `;
                 break;
             case 'consolidator':
                 content = `
                     <h4>Consolidator</h4>
+                    <label>Agent:</label>
+                    <select class="flow-step-agent flow-step-input" data-id="${step.id}"><option value="">Select Agent</option>${agentOptions}</select>
                     <label>Text before alternatives:</label>
-                    <textarea class="flow-step-pre-prompt" rows="2" data-id="${step.id}">${step.prePrompt || ''}</textarea>
+                    <textarea class="flow-step-pre-prompt flow-step-input" rows="2" data-id="${step.id}">${step.prePrompt || ''}</textarea>
                     <label>Text after alternatives:</label>
-                    <textarea class="flow-step-post-prompt" rows="2" data-id="${step.id}">${step.postPrompt || ''}</textarea>
+                    <textarea class="flow-step-post-prompt flow-step-input" rows="2" data-id="${step.id}">${step.postPrompt || ''}</textarea>
                 `;
                 break;
         }
@@ -218,7 +233,6 @@ const agentsPlugin = {
                 }
             }
         });
-
         const canvas = document.getElementById('flow-canvas');
         canvas.addEventListener('mousedown', e => this.handleFlowCanvasMouseDown(e));
         canvas.addEventListener('mousemove', e => this.handleFlowCanvasMouseMove(e));
@@ -297,16 +311,19 @@ const agentsPlugin = {
                 newStep.prompt = '';
                 break;
             case 'conditional':
-                newStep.condition = ''; // regex or string
-                newStep.stopOnMatch = true;
+                newStep.conditionType = 'contains';
+                newStep.condition = '';
+                newStep.onMatch = 'stop';
                 break;
             case 'multi':
+                newStep.agentId = '';
                 newStep.prompt = '';
-                newStep.count = 3;
+                newStep.count = 2;
                 break;
             case 'consolidator':
-                newStep.prePrompt = '';
-                newStep.postPrompt = '';
+                newStep.agentId = '';
+                newStep.prePrompt = 'Please choose the best of the following answers:';
+                newStep.postPrompt = 'Explain your choice.';
                 break;
         }
         chat.flow.steps.push(newStep);
@@ -323,7 +340,8 @@ const agentsPlugin = {
         if (target.classList.contains('flow-step-agent')) step.agentId = target.value;
         if (target.classList.contains('flow-step-prompt')) step.prompt = target.value;
         if (target.classList.contains('flow-step-condition')) step.condition = target.value;
-        if (target.classList.contains('flow-step-stop-on-match')) step.stopOnMatch = target.checked;
+        if (target.classList.contains('flow-step-condition-type')) step.conditionType = target.value;
+        if (target.classList.contains('flow-step-on-match')) step.onMatch = target.value;
         if (target.classList.contains('flow-step-count')) step.count = parseInt(target.value, 10);
         if (target.classList.contains('flow-step-pre-prompt')) step.prePrompt = target.value;
         if (target.classList.contains('flow-step-post-prompt')) step.postPrompt = target.value;
@@ -445,12 +463,6 @@ const agentsPlugin = {
         log(3, message);
     },
 
-    getNextStep(stepId) {
-        const { steps, connections } = this.store.get('currentChat').flow;
-        const nextConnection = connections.find(c => c.from === stepId);
-        return nextConnection ? steps.find(s => s.id === nextConnection.to) : null;
-    },
-
     executeStep(step) {
         if (!this.flowRunning) return;
         if (this.stepCounter++ >= this.maxSteps) {
@@ -473,52 +485,63 @@ const agentsPlugin = {
                 this.store.set('currentChat', { ...chat });
                 this.app.submitUserMessage(step.prompt, 'user');
                 break;
-
-            case 'conditional':
-                const lastMessage = this.app.ui.chatBox.chatlog.getLastMessage()?.value.content || '';
-                let isMatch = false;
-                const condition = step.condition || '';
-                if (condition.startsWith('/') && condition.endsWith('/')) {
-                    try {
-                        const regex = new RegExp(condition.slice(1, -1));
-                        isMatch = regex.test(lastMessage);
-                    } catch (e) {
-                        triggerError(`Invalid regex in conditional step: ${e.message}`);
-                        return this.stopFlow('Invalid regex.');
-                    }
-                } else {
-                    isMatch = lastMessage.includes(condition);
-                }
-
-                if (isMatch) {
-                    if (step.stopOnMatch) {
-                        return this.stopFlow('Flow stopped by conditional match.');
-                    }
-                } else {
-                    // If it doesn't match, we skip the next step in the "true" path
-                    // This assumes the "false" path is the second connection from the node.
-                    // For now, we only support a single path forward.
-                }
-                const nextStep = this.getNextStep(step.id);
-                if (nextStep) {
-                    this.executeStep(nextStep);
-                } else {
-                    this.stopFlow('Flow execution complete.');
-                }
-                break;
-
             case 'multi':
-                if (!step.prompt || !step.count) {
+                if (!step.agentId || !step.prompt) {
                     triggerError(`Multi-Message step is not fully configured.`);
                     return this.stopFlow('Step not configured.');
                 }
                 this.multiMessageInfo.active = true;
                 this.multiMessageInfo.step = step;
                 this.multiMessageInfo.counter = 1;
+                chat.activeAgentId = step.agentId;
+                this.store.set('currentChat', { ...chat });
                 this.app.submitUserMessage(step.prompt, 'user');
-                // Flow continues in onMessageComplete
                 break;
+            case 'conditional':
+                const lastMessage = this.app.ui.chatBox.chatlog.getLastMessage()?.value.content || '';
+                let isMatch = false;
+                const condition = step.condition || '';
 
+                try {
+                    switch(step.conditionType) {
+                        case 'regex':
+                            isMatch = new RegExp(condition).test(lastMessage);
+                            break;
+                        case 'matches':
+                            isMatch = (lastMessage === condition);
+                            break;
+                        case 'contains':
+                        default:
+                            isMatch = lastMessage.includes(condition);
+                            break;
+                    }
+                } catch (e) {
+                    triggerError(`Invalid regex in conditional step: ${e.message}`);
+                    return this.stopFlow('Invalid regex.');
+                }
+
+                let shouldContinue = true;
+                if (isMatch) {
+                    if (step.onMatch === 'stop') {
+                        this.stopFlow('Flow stopped by conditional match.');
+                        shouldContinue = false;
+                    }
+                } else {
+                    if (step.onMatch === 'continue') {
+                        this.stopFlow('Flow stopped: condition not met.');
+                        shouldContinue = false;
+                    }
+                }
+
+                if (shouldContinue) {
+                    const nextStep = this.getNextStep(step.id);
+                    if (nextStep) {
+                        this.executeStep(nextStep);
+                    } else {
+                        this.stopFlow('Flow execution complete.');
+                    }
+                }
+                break;
             case 'consolidator':
                 const incomingConnections = chat.flow.connections.filter(c => c.to === step.id);
                 if (incomingConnections.length !== 1) {
@@ -539,6 +562,8 @@ const agentsPlugin = {
                 }).join('\n\n');
 
                 const finalPrompt = `${step.prePrompt || ''}\n\n${consolidatedContent}\n\n${step.postPrompt || ''}`;
+                chat.activeAgentId = step.agentId;
+                this.store.set('currentChat', { ...chat });
                 this.app.submitUserMessage(finalPrompt, 'user');
                 break;
         }
@@ -596,7 +621,15 @@ agentsPlugin.hooks.onMessageComplete = async (message, chatlog, chatbox) => {
         const { step, counter } = agentsPlugin.multiMessageInfo;
         if (counter < step.count) {
             agentsPlugin.multiMessageInfo.counter++;
-            agentsPlugin.app.submitUserMessage(step.prompt, 'user');
+            const chat = agentsPlugin.store.get('currentChat');
+            chat.activeAgentId = step.agentId;
+            agentsPlugin.store.set('currentChat', { ...chat });
+            // Manually add user message and trigger generation to create distinct history
+            const chatlog = agentsPlugin.app.ui.chatBox.chatlog;
+            chatlog.addMessage({ role: 'user', content: step.prompt });
+            chatlog.addMessage(null);
+            chatlog.notify();
+            agentsPlugin.app.generateAIResponse({}, chatlog);
             return; // Stop further processing, let the multi-message loop continue
         } else {
             // Multi-message step is complete, reset and let the flow continue.
@@ -688,7 +721,9 @@ agentsPlugin.hooks.onMessageComplete = async (message, chatlog, chatbox) => {
 
     // Flow continuation logic: Only proceed if there are no tool calls of any kind.
     if (agentsPlugin.flowRunning && toolCalls.length === 0) {
-        const nextStep = agentsPlugin.getNextStep(agentsPlugin.currentStepId);
+        const { steps, connections } = currentChat.flow;
+        const nextConnection = connections.find(c => c.from === agentsPlugin.currentStepId);
+        const nextStep = nextConnection ? steps.find(s => s.id === nextConnection.to) : null;
         if (nextStep) {
             agentsPlugin.executeStep(nextStep);
         } else {

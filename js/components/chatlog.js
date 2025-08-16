@@ -331,8 +331,10 @@ class Chatlog {
     }
 
     /**
-     * Gets the last set of alternatives in the active path.
-     * @returns {Alternatives | null} The last alternatives.
+     * Gets the last N messages from the active path, optionally filtered by role.
+     * @param {number} n - The number of messages to get.
+     * @param {string} [role] - The role to filter by (e.g., 'assistant').
+     * @returns {Array<Message>} The last N messages.
      */
     getLastNMessages(n, role) {
         log(5, `Chatlog: getLastNMessages called for n=${n}, role=${role}`);
