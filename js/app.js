@@ -17,6 +17,7 @@ import { showLogin, showLogout } from './utils/ui.js';
 import { hooks, registerPlugin } from './hooks.js';
 import { formattingPlugins } from './plugins/formatting.js';
 import { alternativeNavigationPlugin, messageModificationPlugin } from './plugins/ui-controls.js';
+import { flowControlsPlugin } from './plugins/flow-controls.js';
 import { avatarsPlugin } from './plugins/avatars.js';
 import { mcpPlugin } from './plugins/mcp.js';
 import { errorBubblePlugin } from './plugins/error-bubble.js';
@@ -41,7 +42,8 @@ class App {
             topPEl: document.getElementById('topP'),
         };
         this.store = new Store({
-            receiving: false,
+            receiving:false,
+            isSummarizing: false,
             regenerateLastAnswer: false,
             controller: new AbortController(),
             editingPos: null,
@@ -111,8 +113,27 @@ class App {
         formattingPlugins.forEach(plugin => registerPlugin(plugin, this));
         registerPlugin(alternativeNavigationPlugin, this);
         registerPlugin(messageModificationPlugin, this);
+        registerPlugin(flowControlsPlugin, this);
         registerPlugin(avatarsPlugin, this);
         registerPlugin(errorBubblePlugin, this);
+
+        hooks.onMessageComplete.push((message, chatlog) => {
+            if (this.store.get('isSummarizing')) {
+                this.store.set('isSummarizing', false);
+                const summary = message.value.content;
+                const systemPrompt = chatlog.getFirstMessage();
+
+                chatlog.rootAlternatives = new Alternatives();
+                chatlog.cache = new Map();
+
+                if (systemPrompt && systemPrompt.value.role === 'system') {
+                    chatlog.addMessage(systemPrompt.value);
+                }
+                chatlog.addMessage({ role: 'user', content: 'Summary of the previous conversation:' });
+                chatlog.addMessage({ role: 'assistant', content: summary });
+                chatlog.notify();
+            }
+        });
     }
 
     /**
@@ -322,6 +343,7 @@ class App {
         }
         const temperature = options.temperature ?? Number(this.ui.temperatureEl.value);
         const topP = options.top_p ?? Number(this.ui.topPEl.value);
+        const seed = this.settingsPanel.getSeed();
         this.store.set('receiving', true);
         const targetMessage = targetChatlog.getLastMessage();
         try {
@@ -332,6 +354,9 @@ class App {
                 top_p: topP,
                 stream: true
             };
+            if (seed) {
+                payload.seed = seed;
+            }
             if (payload.messages.length <= 1) return;
             if (payload.messages[0]?.role === 'system') {
                 let systemContent = payload.messages[0].content;
@@ -418,6 +443,12 @@ class App {
      * @param {string} message - The message to submit.
      * @param {string} userRole - The role of the user.
      */
+    summarizeAndClear(prompt) {
+        this.store.set('isSummarizing', true);
+        const fullPrompt = `Summarize the following text:\n\n${prompt}`;
+        this.submitUserMessage(fullPrompt, 'user');
+    }
+
     async submitUserMessage(message, userRole) {
         log(3, 'App: submitUserMessage called with role', userRole);
         // Ensure we are acting on the chatlog instance currently displayed in the UI

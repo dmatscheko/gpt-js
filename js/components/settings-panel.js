@@ -33,6 +33,8 @@ class SettingsPanel {
             temperatureValue: document.getElementById('temperatureValue'),
             topPEl: document.getElementById('topP'),
             topPValue: document.getElementById('topPValue'),
+            seedEl: document.getElementById('seed'),
+            seedValue: document.getElementById('seedValue'),
             endpointEl: document.getElementById('endpoint'),
             apiKeyEl: document.getElementById('apiKey'),
             loginBtn: document.getElementById('login-btn'),
@@ -51,6 +53,7 @@ class SettingsPanel {
         this.ui.settingsButton.addEventListener('click', () => this.toggle());
         this.ui.temperatureEl.addEventListener('input', () => this.updateSliderValues());
         this.ui.topPEl.addEventListener('input', () => this.updateSliderValues());
+        this.ui.seedEl.addEventListener('input', () => this.updateSliderValues());
         this.ui.loginBtn.addEventListener('click', () => this.handleLogin());
         this.ui.logoutBtn.addEventListener('click', () => this.handleLogout());
         this.ui.refreshModelsButton.addEventListener('click', () => this.onRefreshModels());
@@ -76,6 +79,17 @@ class SettingsPanel {
     updateSliderValues() {
         this.ui.temperatureValue.textContent = this.ui.temperatureEl.value;
         this.ui.topPValue.textContent = this.ui.topPEl.value;
+        const seed = this.ui.seedEl.value;
+        this.ui.seedValue.textContent = seed === '0' ? 'off' : seed;
+    }
+
+    /**
+     * Gets the current seed value.
+     * @returns {number|null} The seed value, or null if not set.
+     */
+    getSeed() {
+        const seed = this.ui.seedEl.value;
+        return seed === '0' ? null : parseInt(seed, 10);
     }
 
     /**

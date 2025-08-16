@@ -105,12 +105,11 @@
             <input type="range" id="topP" min="0" max="1.0" step="0.05" value="1.0">
             <span id="topPValue"></span>
         </p>
-        <!--
         <p>
-            TODO: seed
-            ( https://platform.openai.com/docs/api-reference/chat/create#chat-create-seed )
+            <label for="seed">Seed</label><br>
+            <input type="range" id="seed" min="0" max="9999999" step="1" value="0">
+            <span id="seedValue"></span>
         </p>
-        -->
         <fieldset>
             <legend>User role</legend>
             <input type="radio" id="system" name="user_role" value="system">
