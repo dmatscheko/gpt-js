@@ -1,0 +1,38 @@
+{
+  "datetime": {
+    "command": "uvx",
+    "args": [
+      "fastmcp",
+      "run",
+      "./_mcp_servers/datetime-mcp/datetime-mcp.py"
+    ]
+  },
+  "fetch": {
+    "command": "uvx",
+    "args": [
+      "fastmcp",
+      "run",
+      "./_mcp_servers/fetch-mcp/fetch-mcp.py"
+    ]
+  },
+  "filesystem-read": {
+    "command": "uvx",
+    "args": [
+      "fastmcp",
+      "run",
+      "./_mcp_servers/filesystem_read-mcp/filesystem_read-mcp.py",
+      "--",
+      "./_mcp_filesystem/read_write"
+    ]
+  },
+  "watcher": {
+    "command": "uvx",
+    "args": [
+      "fastmcp",
+      "run",
+      "./_mcp_servers/file_watcher-mcp/file_watcher-mcp.py",
+      "--",
+      "./_mcp_filesystem/watcher"
+    ]
+  }
+}
