@@ -6,7 +6,9 @@ from fastmcp import FastMCP
 import os
 from pydantic import BaseModel, Field, ValidationError
 import re
+import subprocess
 import sys
+import tempfile
 from typing import Annotated, Dict, List, Optional
 
 
@@ -178,6 +180,43 @@ def create_directory(path: Annotated[str, Field(description="The virtual path of
         return f"Created {path}"
     except Exception as e:
         return get_error_message("Error creating", path, e)
+
+
+@mcp.tool
+def apply_diff(
+    path: Annotated[str, Field(description="The virtual path of the file to patch.")],
+    diff: Annotated[str, Field(description="The diff to apply to the file.")],
+    dry_run: Annotated[bool, Field(description="If true, only check if the patch would apply cleanly, without modifying the file.")] = False,
+) -> str:
+    """Apply a diff to a file using the patch utility."""
+    try:
+        real_path = validate_virtual_path(path)
+
+        # Create a temporary file for the diff
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as diff_file:
+            diff_file.write(diff)
+            diff_filename = diff_file.name
+
+        try:
+            command = ["patch", "--unified", real_path, diff_filename]
+            if dry_run:
+                command.insert(1, "--dry-run")
+
+            result = subprocess.run(command, capture_output=True, text=True, check=False)
+
+            if result.returncode == 0:
+                if dry_run:
+                    return f"Dry run: Patch would apply cleanly to {path}.\n\n{result.stdout}"
+                else:
+                    return f"Patch applied successfully to {path}.\n\n{result.stdout}"
+            else:
+                return f"Error applying patch to {path} (exit code {result.returncode}):\n\nSTDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
+        finally:
+            # Clean up the temporary file
+            os.remove(diff_filename)
+
+    except Exception as e:
+        return get_error_message("Error applying diff", path, e)
 
 
 @mcp.tool
