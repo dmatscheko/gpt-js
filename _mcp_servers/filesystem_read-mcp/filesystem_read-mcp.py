@@ -168,7 +168,9 @@ def read_multiple_files(paths: Annotated[str, Field(description="A list of virtu
     try:
         results = []
         seen = set()
-        for virtual_path in paths.strip().split("\n"):
+        for virtual_path in paths.split("\n"):
+            if virtual_path == "":
+                continue
             if virtual_path not in seen:
                 try:
                     seen.add(virtual_path)

@@ -190,8 +190,8 @@ def _apply_simplified_patch(original_content: str, diff: str):
     original_lines = original_content.splitlines()
 
     # Parse the diff into segments
-    diff_lines = diff.strip().split('\n')
-    segment_start_indices = [i for i, line in enumerate(diff_lines) if line.startswith('---')]
+    diff_lines = diff.strip().split("\n")
+    segment_start_indices = [i for i, line in enumerate(diff_lines) if line.startswith("---")]
 
     if not segment_start_indices:
         raise ValueError("Invalid patch format: no segment separators '---' found.")
@@ -199,13 +199,13 @@ def _apply_simplified_patch(original_content: str, diff: str):
     segments = []
     for i in range(len(segment_start_indices)):
         start_index = segment_start_indices[i]
-        end_index = len(diff_lines) if i + 1 == len(segment_start_indices) else segment_start_indices[i+1]
+        end_index = len(diff_lines) if i + 1 == len(segment_start_indices) else segment_start_indices[i + 1]
 
         header = diff_lines[start_index]
-        content = diff_lines[start_index+1:end_index]
+        content = diff_lines[start_index + 1 : end_index]
 
         start_line_gte = None
-        match = re.search(r'line >= (\d+)', header)
+        match = re.search(r"line >= (\d+)", header)
         if match:
             start_line_gte = int(match.group(1))
 
@@ -213,19 +213,21 @@ def _apply_simplified_patch(original_content: str, diff: str):
         to_lines = []
 
         for line in content:
-            if line.startswith('-'):
+            if line.startswith("-"):
                 from_lines.append(line[1:])
-            elif line.startswith('+'):
+            elif line.startswith("+"):
                 to_lines.append(line[1:])
             else:
                 from_lines.append(line)
                 to_lines.append(line)
 
-        segments.append({
-            "start_line_gte": start_line_gte,
-            "from_lines": from_lines,
-            "to_lines": to_lines,
-        })
+        segments.append(
+            {
+                "start_line_gte": start_line_gte,
+                "from_lines": from_lines,
+                "to_lines": to_lines,
+            }
+        )
 
     # Apply segments
     new_lines = original_lines[:]
@@ -236,11 +238,11 @@ def _apply_simplified_patch(original_content: str, diff: str):
             if segment["start_line_gte"] >= current_search_start_line + 1:
                 search_from = segment["start_line_gte"] - 1
             else:
-                warnings.append(f"Warning: segment {i+1} 'line >= {segment['start_line_gte']}' is not after previous segment end line. Ignoring.")
+                warnings.append(f"Warning: segment {i + 1} 'line >= {segment['start_line_gte']}' is not after previous segment end line. Ignoring.")
 
         found_at = -1
         # Search for the from_lines block
-        if not segment['from_lines']: # Segment only adds lines
+        if not segment["from_lines"]:  # Segment only adds lines
             found_at = search_from
         else:
             for line_idx in range(search_from, len(new_lines) - len(segment["from_lines"]) + 1):
@@ -249,7 +251,7 @@ def _apply_simplified_patch(original_content: str, diff: str):
                     break
 
         if found_at == -1:
-            raise ValueError(f"Patch segment {i+1} could not be applied.")
+            raise ValueError(f"Patch segment {i + 1} could not be applied.")
 
         # Apply the patch
         new_lines[found_at : found_at + len(segment["from_lines"])] = segment["to_lines"]
@@ -269,19 +271,9 @@ def apply_diff(
     diff: Annotated[str, Field(description="The simplified diff to apply to the file.")],
     dry_run: Annotated[bool, Field(description="If true, only check if the patch would apply cleanly, without modifying the file.")] = False,
 ) -> str:
-    """Apply a simplified diff format to a file.
-
-    The patch format is composed of segments separated by '---'.
-    Each segment starts with a header line like '--- ---' or '--- line >= x ---'.
-    The 'line >= x' in the header is optional and tells the patch tool to start searching for the patch location from line number x.
-
-    Within each segment:
-    - Lines starting with '-' are lines to be removed.
-    - Lines starting with '+' are lines to be added.
-    - Lines with no prefix are context lines, which must match the original file.
-
-    The patch is applied sequentially. Each segment is searched for and applied in order, starting from the end of the previous patch.
-
+    """Apply a simplified patch format to a file. The format is composed of segments separated by '---'. Each segment starts with a header line like '--- ---' or '--- line >= x ---'. The 'line >= x' in the header is optional and tells the patch tool to start searching for the patch location from line number x.
+    Within each segment: Lines starting with '-' are lines to be removed. Lines starting with '+' are lines to be added. Lines starting with ' ' are context lines, which must match the original file.
+    The patch is applied sequentially. Each segment is searched for and applied in order, starting from the end of the previous segment, or if line >= x is higher than the line number of the end of the previous segment, the next line to replace is searched from that line downwards.
     Example of a patch segment:
     --- line >= 3 ---
     -Beneath the velvet cloak of night so deep,
