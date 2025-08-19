@@ -1048,21 +1048,27 @@ const agentsPlugin = {
                 }
 
                 let fullAnswerText = '';
-                let currentMessageNode = aiAnswerMessages[0];
                 const messagesToDelete = new Set();
 
-                while (currentMessageNode) {
-                    if (currentMessageNode.value && currentMessageNode.value.content) {
-                        fullAnswerText += currentMessageNode.value.content + '\n\n';
+                for (const msg of aiAnswerMessages) {
+                    let contentToAppend = '';
+                    if (msg.value) {
+                        if (msg.value.content) {
+                            let content = msg.value.content;
+                            if (typeof content !== 'string') {
+                                content = JSON.stringify(content, null, 2);
+                            }
+                            contentToAppend += content;
+                        }
+                        if (msg.value.tool_calls) {
+                            contentToAppend += JSON.stringify(msg.value.tool_calls, null, 2);
+                        }
                     }
-                    messagesToDelete.add(currentMessageNode.originalIndex);
 
-                    if (currentMessageNode.answerAlternatives && currentMessageNode.answerAlternatives.messages.length > 0) {
-                        const nextMessageInChain = currentMessageNode.answerAlternatives.messages[0];
-                        currentMessageNode = rlaMessages.find(m => m.id === nextMessageInChain.id);
-                    } else {
-                        currentMessageNode = null;
+                    if (contentToAppend) {
+                        fullAnswerText += contentToAppend + '\n\n';
                     }
+                    messagesToDelete.add(msg.originalIndex);
                 }
 
                 fullAnswerText = fullAnswerText.trim();
