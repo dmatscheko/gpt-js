@@ -1,0 +1,8 @@
+{
+  "resources": [
+    {
+      "url": "/js/devtools/formatters.js",
+      "type": "script"
+    }
+  ]
+}
