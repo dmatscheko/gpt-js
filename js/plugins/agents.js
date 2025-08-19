@@ -141,8 +141,14 @@ function renderFlow(store) {
                     <div class="flow-step-content">
                         <label>From answer #:</label>
                         <input type="number" class="flow-step-clear-from flow-step-input" data-id="${step.id}" value="${step.clearFrom || 1}" min="1">
-                        <label>To answer #:</label>
-                        <input type="number" class="flow-step-clear-to flow-step-input" data-id="${step.id}" value="${step.clearTo || 1}" min="1">
+                        <div class="clear-history-to-container" style="${step.clearToBeginning ? 'display: none;' : ''}">
+                            <label>To answer #:</label>
+                            <input type="number" class="flow-step-clear-to flow-step-input" data-id="${step.id}" value="${step.clearTo || 1}" min="1">
+                        </div>
+                        <label class="flow-step-checkbox-label">
+                            <input type="checkbox" class="flow-step-clear-beginning flow-step-input" data-id="${step.id}" ${step.clearToBeginning ? 'checked' : ''}>
+                            Clear to beginning
+                        </label>
                         <small>(1 is the last answer)</small>
                     </div>
                 `;
@@ -526,6 +532,7 @@ const agentsPlugin = {
             case 'clear-history':
                 newStep.clearFrom = 1;
                 newStep.clearTo = 1;
+                newStep.clearToBeginning = false;
                 break;
             case 'conditional-stop':
                 newStep.conditionType = 'contains';
@@ -577,6 +584,10 @@ const agentsPlugin = {
         if (target.classList.contains('flow-step-delete-user')) step.deleteUserMessage = target.checked;
         if (target.classList.contains('flow-step-clear-from')) step.clearFrom = parseInt(target.value, 10);
         if (target.classList.contains('flow-step-clear-to')) step.clearTo = parseInt(target.value, 10);
+        if (target.classList.contains('flow-step-clear-beginning')) {
+            step.clearToBeginning = target.checked;
+            renderFlow(this.store);
+        }
 
 
         this.store.set('currentChat', { ...chat });
@@ -839,7 +850,7 @@ const agentsPlugin = {
                     .filter(i => i !== -1);
 
                 const clearFrom = step.clearFrom || 1;
-                const clearTo = step.clearTo || 1;
+                const clearTo = step.clearToBeginning ? userMessageIndices.length : (step.clearTo || 1);
 
                 const fromIndex = userMessageIndices.length - clearTo;
                 const toIndex = userMessageIndices.length - clearFrom;
