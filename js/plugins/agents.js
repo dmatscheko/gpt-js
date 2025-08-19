@@ -222,8 +222,8 @@ function renderFlow(store) {
                         <textarea class="flow-step-pre-prompt flow-step-input" rows="2" data-id="${step.id}">${step.prePrompt || ''}</textarea>
                         <label>Text after AI answer:</label>
                         <textarea class="flow-step-post-prompt flow-step-input" rows="2" data-id="${step.id}">${step.postPrompt || ''}</textarea>
-                        <label style="display: block; margin-top: 5px;"><input type="checkbox" class="flow-step-delete-ai flow-step-input" data-id="${step.id}" ${step.deleteAIAnswer ? 'checked' : ''}> Delete original AI answer</label>
-                        <label style="display: block; margin-top: 5px;"><input type="checkbox" class="flow-step-delete-user flow-step-input" data-id="${step.id}" ${step.deleteUserMessage ? 'checked' : ''}> Delete original user message</label>
+                        <label class="flow-step-checkbox-label"><input type="checkbox" class="flow-step-delete-ai flow-step-input" data-id="${step.id}" ${step.deleteAIAnswer ? 'checked' : ''}> Delete original AI answer</label>
+                        <label class="flow-step-checkbox-label"><input type="checkbox" class="flow-step-delete-user flow-step-input" data-id="${step.id}" ${step.deleteUserMessage ? 'checked' : ''}> Delete original user message</label>
                     </div>
                 `;
                 break;
