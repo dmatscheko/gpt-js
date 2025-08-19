@@ -45,6 +45,7 @@ export const mcpPlugin = {
     configService: null,
     mcpUrl: null,
     mcpSessionId: null,
+    tools: [],
     cachedToolsSection: '',
     isInitialized: false,
     initPromise: null,
@@ -86,8 +87,8 @@ export const mcpPlugin = {
         if (!this.cachedToolsSection) {
             log(4, 'mcpPlugin: Pre-fetching tools from MCP', this.mcpUrl);
             this.mcpJsonRpc('tools/list').then(response => {
-                const toolsArray = Array.isArray(response.tools) ? response.tools : [];
-                this.cachedToolsSection = this.generateToolsSection(toolsArray);
+                this.tools = Array.isArray(response.tools) ? response.tools : [];
+                this.cachedToolsSection = this.generateToolsSection(this.tools);
                 log(3, 'mcpPlugin: Tools section cached successfully');
             }).catch(error => {
                 log(1, 'mcpPlugin: Failed to pre-fetch tools', error);
@@ -163,7 +164,7 @@ export const mcpPlugin = {
                 return;
             }
             const context = { message, plugin: this }; // Pass message for metadata updates
-            await processToolCalls(message, chatlog, chatbox, this.filterMcpCalls, this.executeMcpCall, context);
+            await processToolCalls(message, chatlog, chatbox, this.filterMcpCalls, this.executeMcpCall, context, this.tools);
         },
         /**
          * Replaces citation XML tags with HTML superscript links.

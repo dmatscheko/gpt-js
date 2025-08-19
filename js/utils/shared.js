@@ -18,11 +18,12 @@ import { hooks } from '../hooks.js';
  * @param {function(object): boolean} filterCallback - A function to filter which tool calls to process.
  * @param {function(object): Promise<object>} executeCallback - An async function to execute a tool call and return the result.
  * @param {object} context - Additional context to pass to the callbacks.
+ * @param {Array<object>} [tools=[]] - A list of available tools with their schemas.
  */
-export async function processToolCalls(message, chatlog, chatbox, filterCallback, executeCallback, context) {
+export async function processToolCalls(message, chatlog, chatbox, filterCallback, executeCallback, context, tools = []) {
     if (message.value.role !== 'assistant') return;
 
-    const { toolCalls, positions, isSelfClosings } = parseFunctionCalls(message.value.content);
+    const { toolCalls, positions, isSelfClosings } = parseFunctionCalls(message.value.content, tools);
     if (toolCalls.length === 0) return;
 
     const applicableCalls = toolCalls.filter(filterCallback);

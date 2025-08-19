@@ -5,9 +5,10 @@ import { log } from './logger.js';
 /**
  * Parses <dma:tool_call> tags and extracts tool calls.
  * @param {string} content - The content to parse.
+ * @param {Array<object>} [tools=[]] - A list of available tools with their schemas.
  * @returns {{toolCalls: Object[], positions: Object[], isSelfClosings: boolean[]}} The parsed tool calls, their positions, and self-closing flags.
  */
-export function parseFunctionCalls(content) {
+export function parseFunctionCalls(content, tools = []) {
     log(5, 'parseFunctionCalls called');
     const toolCalls = [];
     const positions = [];
@@ -31,6 +32,7 @@ export function parseFunctionCalls(content) {
 
         const [, name] = nameMatch;
         const params = {};
+        const toolDef = tools.find(t => t.name === name);
 
         if (!isSelfClosing) {
             let paramMatch;
@@ -38,8 +40,24 @@ export function parseFunctionCalls(content) {
                 const [, paramName, paramValue] = paramMatch;
                 let value = paramValue.trim();
                 value = value.replace(/<\\\/dma:tool_call>/g, '</dma:tool_call>').replace(/<\\\/parameter>/g, '</parameter>');
+
+                if (toolDef && toolDef.inputSchema?.properties?.[paramName]) {
+                    const prop = toolDef.inputSchema.properties[paramName];
+                    if (value === '' && (prop.type === 'integer' || prop.type === 'number')) {
+                        value = null;
+                    } else if (prop.type === 'integer') {
+                        const parsed = parseInt(value, 10);
+                        value = isNaN(parsed) ? null : parsed;
+                    } else if (prop.type === 'number') {
+                        const parsed = parseFloat(value);
+                        value = isNaN(parsed) ? null : parsed;
+                    } else if (prop.type === 'boolean') {
+                        value = value.toLowerCase() === 'true';
+                    }
+                }
+
                 params[paramName] = value;
-                log(5, "mcpPlugin: parseFunctionCalls value", value);
+                log(5, 'mcpPlugin: parseFunctionCalls value', { name: paramName, value: value, type: typeof value });
             }
         }
 
