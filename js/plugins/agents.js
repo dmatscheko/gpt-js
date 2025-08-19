@@ -135,14 +135,21 @@ function renderFlow(store) {
                     </div>
                 `;
                 break;
-            case 'prompt-and-clear':
+            case 'clear-history':
                 content = `
-                    <h4>Prompt and Clear</h4>
+                    <h4>Clear History</h4>
                     <div class="flow-step-content">
-                        <label>Agent:</label>
-                        <select class="flow-step-agent flow-step-input" data-id="${step.id}"><option value="">Select Agent</option>${agentOptions}</select>
-                        <label>Prompt:</label>
-                        <textarea class="flow-step-prompt flow-step-input" rows="3" data-id="${step.id}">${step.prompt || ''}</textarea>
+                        <label>From answer #:</label>
+                        <input type="number" class="flow-step-clear-from flow-step-input" data-id="${step.id}" value="${step.clearFrom || 1}" min="1">
+                        <div class="clear-history-to-container" style="${step.clearToBeginning ? 'display: none;' : ''}">
+                            <label>To answer #:</label>
+                            <input type="number" class="flow-step-clear-to flow-step-input" data-id="${step.id}" value="${step.clearTo || 1}" min="1">
+                        </div>
+                        <label class="flow-step-checkbox-label">
+                            <input type="checkbox" class="flow-step-clear-beginning flow-step-input" data-id="${step.id}" ${step.clearToBeginning ? 'checked' : ''}>
+                            Clear to beginning
+                        </label>
+                        <small>(1 is the last answer)<br><br></small>
                     </div>
                 `;
                 break;
@@ -202,6 +209,21 @@ function renderFlow(store) {
                         <textarea class="flow-step-pre-prompt flow-step-input" rows="2" data-id="${step.id}">${step.prePrompt || ''}</textarea>
                         <label>Text after alternatives:</label>
                         <textarea class="flow-step-post-prompt flow-step-input" rows="2" data-id="${step.id}">${step.postPrompt || ''}</textarea>
+                    </div>
+                `;
+                break;
+            case 'echo-answer':
+                content = `
+                    <h4>Echo Answer</h4>
+                    <div class="flow-step-content">
+                        <label>Agent:</label>
+                        <select class="flow-step-agent flow-step-input" data-id="${step.id}"><option value="">Select Agent</option>${agentOptions}</select>
+                        <label>Text before AI answer:</label>
+                        <textarea class="flow-step-pre-prompt flow-step-input" rows="2" data-id="${step.id}">${step.prePrompt || ''}</textarea>
+                        <label>Text after AI answer:</label>
+                        <textarea class="flow-step-post-prompt flow-step-input" rows="2" data-id="${step.id}">${step.postPrompt || ''}</textarea>
+                        <label class="flow-step-checkbox-label"><input type="checkbox" class="flow-step-delete-ai flow-step-input" data-id="${step.id}" ${step.deleteAIAnswer ? 'checked' : ''}> Delete original AI answer</label>
+                        <label class="flow-step-checkbox-label"><input type="checkbox" class="flow-step-delete-user flow-step-input" data-id="${step.id}" ${step.deleteUserMessage ? 'checked' : ''}> Delete original user message</label>
                     </div>
                 `;
                 break;
@@ -355,7 +377,8 @@ const agentsPlugin = {
                         <a href="#" data-step-type="simple-prompt">Simple Prompt</a>
                         <a href="#" data-step-type="multi-prompt">Multi Prompt</a>
                         <a href="#" data-step-type="consolidator">Alt. Consolidator</a>
-                        <a href="#" data-step-type="prompt-and-clear">Prompt and Clear</a>
+                        <a href="#" data-step-type="echo-answer">Echo Answer</a>
+                        <a href="#" data-step-type="clear-history">Clear History</a>
                         <a href="#" data-step-type="branching-prompt">Branching Prompt</a>
                         <a href="#" data-step-type="conditional-stop">Conditional Stop</a>
                     </div>
@@ -506,9 +529,10 @@ const agentsPlugin = {
                 newStep.agentId = '';
                 newStep.prompt = '';
                 break;
-            case 'prompt-and-clear':
-                newStep.agentId = '';
-                newStep.prompt = 'Summarize everything we discussed so far in a way that will allow us to continue our conversation later, only based on that summary.';
+            case 'clear-history':
+                newStep.clearFrom = 2;
+                newStep.clearTo = 1;
+                newStep.clearToBeginning = true;
                 break;
             case 'conditional-stop':
                 newStep.conditionType = 'contains';
@@ -528,6 +552,13 @@ const agentsPlugin = {
                 newStep.agentId = '';
                 newStep.prePrompt = 'Please choose the best of the following answers:';
                 newStep.postPrompt = 'Explain your choice.';
+                break;
+            case 'echo-answer':
+                newStep.agentId = '';
+                newStep.prePrompt = 'Is this idea and code correct? Be concise.\n\n\n';
+                newStep.postPrompt = '';
+                newStep.deleteAIAnswer = true;
+                newStep.deleteUserMessage = true;
                 break;
         }
         chat.flow.steps.push(newStep);
@@ -549,6 +580,15 @@ const agentsPlugin = {
         if (target.classList.contains('flow-step-count')) step.count = parseInt(target.value, 10);
         if (target.classList.contains('flow-step-pre-prompt')) step.prePrompt = target.value;
         if (target.classList.contains('flow-step-post-prompt')) step.postPrompt = target.value;
+        if (target.classList.contains('flow-step-delete-ai')) step.deleteAIAnswer = target.checked;
+        if (target.classList.contains('flow-step-delete-user')) step.deleteUserMessage = target.checked;
+        if (target.classList.contains('flow-step-clear-from')) step.clearFrom = parseInt(target.value, 10);
+        if (target.classList.contains('flow-step-clear-to')) step.clearTo = parseInt(target.value, 10);
+        if (target.classList.contains('flow-step-clear-beginning')) {
+            step.clearToBeginning = target.checked;
+            renderFlow(this.store);
+        }
+
 
         this.store.set('currentChat', { ...chat });
     },
@@ -794,7 +834,6 @@ const agentsPlugin = {
 
         switch (type) {
             case 'simple-prompt':
-            case 'prompt-and-clear':
                 if (!step.agentId || !step.prompt) {
                     triggerError(`Agent step is not fully configured.`);
                     return this.stopFlow('Step not configured.');
@@ -803,6 +842,39 @@ const agentsPlugin = {
                 this.store.set('currentChat', { ...chat });
                 this.app.submitUserMessage(step.prompt, 'user');
                 break;
+            case 'clear-history': {
+                const chChatlog = this.app.ui.chatBox.chatlog;
+                const chMessages = chChatlog.getActiveMessageValues();
+                const userMessageIndices = chMessages
+                    .map((msg, i) => msg.role === 'user' ? i : -1)
+                    .filter(i => i !== -1);
+
+                const clearFrom = step.clearFrom || 1;
+                const clearTo = step.clearToBeginning ? userMessageIndices.length : (step.clearTo || 1);
+
+                const fromIndex = userMessageIndices.length - clearTo;
+                const toIndex = userMessageIndices.length - clearFrom;
+
+                if (fromIndex < 0 || toIndex < 0 || fromIndex > toIndex) {
+                     this.stopFlow('Invalid range for Clear History.');
+                     break;
+                }
+
+                const startMsgIndex = userMessageIndices[fromIndex];
+                const endMsgIndex = (toIndex + 1 < userMessageIndices.length) ? userMessageIndices[toIndex + 1] : chMessages.length;
+
+                for (let i = endMsgIndex - 1; i >= startMsgIndex; i--) {
+                    chChatlog.deleteNthMessage(i);
+                }
+
+                const nextStep = this.getNextStep(step.id);
+                if (nextStep) {
+                    this.executeStep(nextStep);
+                } else {
+                    this.stopFlow('Flow execution complete.');
+                }
+                break;
+            }
             case 'branching-prompt':
                 const bpLastMessage = this.app.ui.chatBox.chatlog.getLastMessage()?.value.content || '';
                 let bpIsMatch = false;
@@ -938,6 +1010,89 @@ const agentsPlugin = {
                 this.store.set('currentChat', { ...chat });
                 this.app.submitUserMessage(finalPrompt, 'user');
                 break;
+            case 'echo-answer': {
+                const rlaChatlog = this.app.ui.chatBox.chatlog;
+                const rlaMessages = rlaChatlog.getActiveMessageValues().map((msg, i) => ({
+                    ...rlaChatlog.getNthMessage(i),
+                    originalIndex: i
+                }));
+
+                let lastMessage = rlaMessages[rlaMessages.length - 1];
+                let endOfAiAnswerRange = rlaMessages.length - 1;
+
+                if (lastMessage && (lastMessage.value.role === 'user' || lastMessage.value.role === 'system')) {
+                    endOfAiAnswerRange--;
+                }
+
+                let startOfAiAnswerRange = -1;
+                let userMessageIndexToDelete = -1;
+                for (let i = endOfAiAnswerRange; i >= 0; i--) {
+                    const msg = rlaMessages[i].value;
+                    if (msg.role === 'user' || msg.role === 'system') {
+                        startOfAiAnswerRange = i + 1;
+                        userMessageIndexToDelete = i;
+                        break;
+                    }
+                }
+                if (startOfAiAnswerRange === -1) { // No user/system message found before
+                    const firstMessage = rlaChatlog.getFirstMessage();
+                    const hasSystemPrompt = firstMessage && firstMessage.value.role === 'system';
+                    startOfAiAnswerRange = hasSystemPrompt ? 1 : 0;
+                }
+
+                const aiAnswerMessages = rlaMessages.slice(startOfAiAnswerRange, endOfAiAnswerRange + 1);
+
+                if (aiAnswerMessages.length === 0) {
+                    triggerError('Reformat step could not find an AI answer to process.');
+                    return this.stopFlow('No AI answer found.');
+                }
+
+                let fullAnswerText = '';
+                const messagesToDelete = new Set();
+
+                for (const msg of aiAnswerMessages) {
+                    let contentToAppend = '';
+                    if (msg.value) {
+                        if (msg.value.content) {
+                            let content = msg.value.content;
+                            if (typeof content !== 'string') {
+                                content = JSON.stringify(content, null, 2);
+                            }
+                            contentToAppend += content;
+                        }
+                        if (msg.value.tool_calls) {
+                            contentToAppend += JSON.stringify(msg.value.tool_calls, null, 2);
+                        }
+                    }
+
+                    if (contentToAppend) {
+                        fullAnswerText += contentToAppend + '\n\n';
+                    }
+                    messagesToDelete.add(msg.originalIndex);
+                }
+
+                fullAnswerText = fullAnswerText.trim();
+                const newPrompt = `${step.prePrompt || ''}\n\n${fullAnswerText}\n\n${step.postPrompt || ''}`;
+
+                if (step.deleteAIAnswer) {
+                    const indicesToDelete = Array.from(messagesToDelete).sort((a, b) => b - a);
+                    for (const index of indicesToDelete) {
+                        rlaChatlog.deleteNthMessage(index);
+                    }
+
+                    if (step.deleteUserMessage && userMessageIndexToDelete !== -1) {
+                         const userMessage = rlaChatlog.getNthMessage(userMessageIndexToDelete);
+                        if (userMessage && userMessage.value.role === 'user') {
+                            rlaChatlog.deleteNthMessage(userMessageIndexToDelete);
+                        }
+                    }
+                }
+
+                chat.activeAgentId = step.agentId;
+                this.store.set('currentChat', { ...chat });
+                this.app.submitUserMessage(newPrompt, 'user');
+                break;
+            }
         }
     },
 
