@@ -163,12 +163,12 @@ def read_file(
 
 
 @mcp.tool
-def read_multiple_files(paths: Annotated[List[str], Field(description="A list of virtual paths of the files to read.")]) -> str:
+def read_multiple_files(paths: Annotated[str, Field(description="A list of virtual paths of the files to read, one path per line.")]) -> str:
     """Read the contents of multiple files efficiently."""
     try:
         results = []
         seen = set()
-        for virtual_path in paths:
+        for virtual_path in paths.strip().split("\n"):
             if virtual_path not in seen:
                 try:
                     seen.add(virtual_path)
