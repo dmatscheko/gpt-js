@@ -269,7 +269,25 @@ def apply_diff(
     diff: Annotated[str, Field(description="The simplified diff to apply to the file.")],
     dry_run: Annotated[bool, Field(description="If true, only check if the patch would apply cleanly, without modifying the file.")] = False,
 ) -> str:
-    """Apply a simplified diff format to a file."""
+    """Apply a simplified diff format to a file.
+
+    The patch format is composed of segments separated by '---'.
+    Each segment starts with a header line like '--- ---' or '--- line >= x ---'.
+    The 'line >= x' in the header is optional and tells the patch tool to start searching for the patch location from line number x.
+
+    Within each segment:
+    - Lines starting with '-' are lines to be removed.
+    - Lines starting with '+' are lines to be added.
+    - Lines with no prefix are context lines, which must match the original file.
+
+    The patch is applied sequentially. Each segment is searched for and applied in order, starting from the end of the previous patch.
+
+    Example of a patch segment:
+    --- line >= 3 ---
+    -Beneath the velvet cloak of night so deep,
+    +Under the velvet cloak of night so deep,
+     Where stars like silver needles stitch the sky,
+    """
     try:
         real_path = validate_virtual_path(path)
         with open(real_path, "r", encoding="utf-8") as f:
