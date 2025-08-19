@@ -201,9 +201,16 @@ export const formattingPlugins = [
                         const div = document.createElement('div');
                         div.classList.add('hljs', 'language-latex');
                         div.dataset.plaintext = encodeURIComponent(origFormulas[i].trim());
+
                         const pe = formula.parentElement;
                         pe.insertBefore(div, formula);
                         div.appendChild(formula);
+
+                        // const pe = formula.parentElement;
+                        // const ppe = pe.parentElement;
+                        // ppe.insertBefore(div, pe);
+                        // ppe.removeChild(pe);
+                        // div.appendChild(pe);
                     }
                 });
             }

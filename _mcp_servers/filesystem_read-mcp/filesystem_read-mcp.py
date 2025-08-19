@@ -94,21 +94,6 @@ def tail_file(real_path: str, lines: int) -> str:
         return "".join(deque(f, maxlen=lines))
 
 
-def apply_edits(virtual_path: str, edits: List[Dict[str, str]], dry_run: bool) -> str:
-    """Apply text replacements and return a diff."""
-    real_path = validate_virtual_path(virtual_path)
-    with open(real_path, "r", encoding="utf-8") as f:
-        content = new_content = f.read()
-    for edit in edits:
-        pattern = rf"^{re.escape(edit['oldText'])}(\r?\n|\r|$)"
-        new_content = re.sub(pattern, lambda m: edit["newText"] + m.group(1), new_content, flags=re.MULTILINE)
-    diff = "".join(difflib.unified_diff(content.splitlines(keepends=True), new_content.splitlines(keepends=True), fromfile=virtual_path, tofile=virtual_path))
-    if not dry_run:
-        with open(real_path, "w", encoding="utf-8") as f:
-            f.write(new_content)
-    return diff
-
-
 def list_files_recursive(virtual_path: str, pattern: Optional[str] = None, exclude_patterns: Optional[List[str]] = None) -> str:
     """List files and directories recursively, optionally filtering by pattern."""
     real_path = validate_virtual_path(virtual_path)
@@ -163,12 +148,14 @@ def read_file(
 
 
 @mcp.tool
-def read_multiple_files(paths: Annotated[List[str], Field(description="A list of virtual paths of the files to read.")]) -> str:
+def read_multiple_files(paths: Annotated[str, Field(description="A list of virtual paths of the files to read, one path per line.")]) -> str:
     """Read the contents of multiple files efficiently."""
     try:
         results = []
         seen = set()
-        for virtual_path in paths:
+        for virtual_path in paths.split("\n"):
+            if virtual_path == "":
+                continue
             if virtual_path not in seen:
                 try:
                     seen.add(virtual_path)
