@@ -1,0 +1,38 @@
+[
+  {
+    "id": "agent-1755305965343",
+    "name": "developer",
+    "description": "Software Developer",
+    "systemPrompt": "You are a Software Developer.",
+    "availableAsTool": false,
+    "useCustomModelSettings": false,
+    "modelSettings": {}
+  },
+  {
+    "id": "agent-1755306008385",
+    "name": "architect",
+    "description": "Software Architect",
+    "systemPrompt": "You are a Software Architect.",
+    "availableAsTool": false,
+    "useCustomModelSettings": false,
+    "modelSettings": {}
+  },
+  {
+    "id": "agent-1755306043662",
+    "name": "tester",
+    "description": "Software Tester",
+    "systemPrompt": "You are a Software Tester.",
+    "availableAsTool": false,
+    "useCustomModelSettings": false,
+    "modelSettings": {}
+  },
+  {
+    "id": "agent-1755306237948",
+    "name": "idea finder",
+    "description": "Idea Finder",
+    "systemPrompt": "You find new ideas.",
+    "availableAsTool": false,
+    "useCustomModelSettings": false,
+    "modelSettings": {}
+  }
+]
