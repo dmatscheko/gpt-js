@@ -6,9 +6,7 @@ from fastmcp import FastMCP
 import os
 from pydantic import BaseModel, Field, ValidationError
 import re
-import subprocess
 import sys
-import tempfile
 from typing import Annotated, Dict, List, Optional
 
 
@@ -182,38 +180,109 @@ def create_directory(path: Annotated[str, Field(description="The virtual path of
         return get_error_message("Error creating", path, e)
 
 
+def _apply_simplified_patch(original_content: str, diff: str):
+    """
+    Applies a simplified patch format to a string content.
+    Returns a tuple of (new_content, report_string).
+    Raises ValueError if the patch cannot be applied.
+    """
+    warnings = []
+    original_lines = original_content.splitlines()
+
+    # Parse the diff into segments
+    diff_lines = diff.strip().split('\n')
+    segment_start_indices = [i for i, line in enumerate(diff_lines) if line.startswith('---')]
+
+    if not segment_start_indices:
+        raise ValueError("Invalid patch format: no segment separators '---' found.")
+
+    segments = []
+    for i in range(len(segment_start_indices)):
+        start_index = segment_start_indices[i]
+        end_index = len(diff_lines) if i + 1 == len(segment_start_indices) else segment_start_indices[i+1]
+
+        header = diff_lines[start_index]
+        content = diff_lines[start_index+1:end_index]
+
+        start_line_gte = None
+        match = re.search(r'line >= (\d+)', header)
+        if match:
+            start_line_gte = int(match.group(1))
+
+        from_lines = []
+        to_lines = []
+
+        for line in content:
+            if line.startswith('-'):
+                from_lines.append(line[1:])
+            elif line.startswith('+'):
+                to_lines.append(line[1:])
+            else:
+                from_lines.append(line)
+                to_lines.append(line)
+
+        segments.append({
+            "start_line_gte": start_line_gte,
+            "from_lines": from_lines,
+            "to_lines": to_lines,
+        })
+
+    # Apply segments
+    new_lines = original_lines[:]
+    current_search_start_line = 0
+    for i, segment in enumerate(segments):
+        search_from = current_search_start_line
+        if segment["start_line_gte"] is not None:
+            if segment["start_line_gte"] >= current_search_start_line + 1:
+                search_from = segment["start_line_gte"] - 1
+            else:
+                warnings.append(f"Warning: segment {i+1} 'line >= {segment['start_line_gte']}' is not after previous segment end line. Ignoring.")
+
+        found_at = -1
+        # Search for the from_lines block
+        if not segment['from_lines']: # Segment only adds lines
+            found_at = search_from
+        else:
+            for line_idx in range(search_from, len(new_lines) - len(segment["from_lines"]) + 1):
+                if new_lines[line_idx : line_idx + len(segment["from_lines"])] == segment["from_lines"]:
+                    found_at = line_idx
+                    break
+
+        if found_at == -1:
+            raise ValueError(f"Patch segment {i+1} could not be applied.")
+
+        # Apply the patch
+        new_lines[found_at : found_at + len(segment["from_lines"])] = segment["to_lines"]
+
+        current_search_start_line = found_at + len(segment["to_lines"])
+
+    report = "Patch applied successfully."
+    if warnings:
+        report += "\nWarnings:\n" + "\n".join(warnings)
+
+    return "\n".join(new_lines), report
+
+
 @mcp.tool
 def apply_diff(
     path: Annotated[str, Field(description="The virtual path of the file to patch.")],
-    diff: Annotated[str, Field(description="The diff to apply to the file.")],
+    diff: Annotated[str, Field(description="The simplified diff to apply to the file.")],
     dry_run: Annotated[bool, Field(description="If true, only check if the patch would apply cleanly, without modifying the file.")] = False,
 ) -> str:
-    """Apply a diff to a file using the patch utility."""
+    """Apply a simplified diff format to a file."""
     try:
         real_path = validate_virtual_path(path)
+        with open(real_path, "r", encoding="utf-8") as f:
+            original_content = f.read()
 
-        # Create a temporary file for the diff
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as diff_file:
-            diff_file.write(diff)
-            diff_filename = diff_file.name
+        new_content, report = _apply_simplified_patch(original_content, diff)
 
-        try:
-            command = ["patch", "--unified", real_path, diff_filename]
-            if dry_run:
-                command.insert(1, "--dry-run")
-
-            result = subprocess.run(command, capture_output=True, text=True, check=False)
-
-            if result.returncode == 0:
-                if dry_run:
-                    return f"Dry run: Patch would apply cleanly to {path}.\n\n{result.stdout}"
-                else:
-                    return f"Patch applied successfully to {path}.\n\n{result.stdout}"
-            else:
-                return f"Error applying patch to {path} (exit code {result.returncode}):\n\nSTDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
-        finally:
-            # Clean up the temporary file
-            os.remove(diff_filename)
+        if dry_run:
+            return f"Dry run successful. {report}"
+        else:
+            with open(real_path, "w", encoding="utf-8") as f:
+                f.write(new_content)
+            return report
 
     except Exception as e:
         return get_error_message("Error applying diff", path, e)
