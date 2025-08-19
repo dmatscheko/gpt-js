@@ -1,29 +1,27 @@
 from collections import deque
 from datetime import datetime
-import difflib
 import fnmatch
 from fastmcp import FastMCP
 import os
-from pydantic import BaseModel, Field, ValidationError
-import re
+from pydantic import ValidationError
 import sys
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated
 
 
 # Custom error class
-class CustomFileSystemError(ValueError):
+class CustomError(ValueError):
     """Custom error for filesystem operations."""
 
     pass
 
 
 # Global mappings for directory access
-_allowed_real_dirs: List[str] = []  # Real file system paths
-_virtual_to_real: Dict[str, str] = {}  # Virtual path -> Real path
-_real_to_virtual: Dict[str, str] = {}  # Real path -> Virtual path
+_allowed_real_dirs: list[str] = []  # Real file system paths
+_virtual_to_real: dict[str, str] = {}  # Virtual path -> Real path
+_real_to_virtual: dict[str, str] = {}  # Real path -> Virtual path
 
 
-def set_allowed_dirs(real_dirs: List[str]) -> None:
+def set_allowed_dirs(real_dirs: list[str]) -> None:
     """Configure allowed real directories and map them to virtual paths (e.g., /data/a)."""
     global _allowed_real_dirs, _virtual_to_real, _real_to_virtual
     _allowed_real_dirs = [os.path.abspath(os.path.expanduser(d)) for d in real_dirs]
@@ -39,7 +37,7 @@ def validate_virtual_path(virtual_path: str) -> str:
             real_path = os.path.join(real_dir, relative) if relative else real_dir
             break
     else:
-        raise CustomFileSystemError(f"Not a valid path (List allowed directories for valid paths): {virtual_path}")
+        raise CustomError(f"Not a valid path (List allowed directories for valid paths): {virtual_path}")
 
     real_path = os.path.normpath(os.path.abspath(real_path))
     try:
@@ -59,18 +57,18 @@ def validate_virtual_path(virtual_path: str) -> str:
 def get_error_message(message, virtual_path: str, e: Exception) -> str:
     """Generate a user-friendly error message using the virtual path."""
     virtual_path = virtual_path or "Unknown path"
-    if isinstance(e, FileNotFoundError):
-        return f"{message}: No such file or directory (List allowed directories for valid paths): {virtual_path}"
+    if isinstance(e, CustomError):
+        return f"{message}: {e}"
+    elif isinstance(e, FileNotFoundError):
+        return f"{message}: No such file or directory: {virtual_path}"
     elif isinstance(e, PermissionError):
-        return f"{message}: Permission denied (List allowed directories for valid paths): {virtual_path}"
+        return f"{message}: Permission denied: {virtual_path}"
     elif isinstance(e, IsADirectoryError):
         return f"{message}: Is a directory: {virtual_path}"
     elif isinstance(e, NotADirectoryError):
-        return f"{message}: Not a valid directory (List allowed directories for valid paths): {virtual_path}"
+        return f"{message}: Not a directory: {virtual_path}"
     elif isinstance(e, FileExistsError):
         return f"{message}: File already exists: {virtual_path}"
-    elif isinstance(e, CustomFileSystemError):
-        return f"{message}: {e}"
     elif isinstance(e, ValidationError):
         errors = e.errors()
         error_details = "; ".join(f"{err['loc'][0]}: {err['msg']}" for err in errors)
@@ -94,7 +92,7 @@ def tail_file(real_path: str, lines: int) -> str:
         return "".join(deque(f, maxlen=lines))
 
 
-def list_files_recursive(virtual_path: str, pattern: Optional[str] = None, exclude_patterns: Optional[List[str]] = None) -> str:
+def list_files_recursive(virtual_path: str, pattern: str = None, exclude_patterns: list[str] = None) -> str:
     """List files and directories recursively, optionally filtering by pattern."""
     real_path = validate_virtual_path(virtual_path)
     matches = []
@@ -112,12 +110,6 @@ def list_files_recursive(virtual_path: str, pattern: Optional[str] = None, exclu
     return "\n".join([f"### Contents of {virtual_path}:"] + sorted(matches))
 
 
-# Tool argument models
-class EditOp(BaseModel):
-    oldText: str = Field(..., description="Line to be replaced")
-    newText: str = Field(..., description="Replacement line")
-
-
 # Server setup
 mcp = FastMCP(
     name="File System Server",
@@ -127,15 +119,15 @@ mcp = FastMCP(
 
 @mcp.tool
 def read_file(
-    path: Annotated[str, Field(description="The virtual path of the file to read.")],
-    head: Annotated[Optional[int], Field(description="The number of lines to read from the beginning of the file.")] = None,
-    tail: Annotated[Optional[int], Field(description="The number of lines to read from the end of the file.")] = None,
+    path: Annotated[str, "The virtual path of the file to read."],
+    head: Annotated[int, "The number of lines to read from the beginning of the file."] = None,
+    tail: Annotated[int, "The number of lines to read from the end of the file."] = None,
 ) -> str:
     """Read file contents from the secure file system. Allows reading the whole file, or just the head or tail."""
     try:
         real_path = validate_virtual_path(path)
         if head is not None and tail is not None:
-            raise CustomFileSystemError("Specify either head or tail, not both")
+            raise CustomError("Specify either head or tail, not both")
         if head is not None:
             return head_file(real_path, head)
         elif tail is not None:
@@ -148,7 +140,7 @@ def read_file(
 
 
 @mcp.tool
-def read_multiple_files(paths: Annotated[str, Field(description="A list of virtual paths of the files to read, one path per line.")]) -> str:
+def read_multiple_files(paths: Annotated[str, "A list of virtual paths of the files to read, one path per line."]) -> str:
     """Read the contents of multiple files efficiently."""
     try:
         results = []
@@ -170,7 +162,7 @@ def read_multiple_files(paths: Annotated[str, Field(description="A list of virtu
 
 
 @mcp.tool
-def list_directory(path: Annotated[str, Field(description="The virtual path of the directory to list.")]) -> str:
+def list_directory(path: Annotated[str, "The virtual path of the directory to list."]) -> str:
     """List the files and directories within a given directory, indicating whether each entry is a file or a directory."""
     try:
         real_path = validate_virtual_path(path)
@@ -182,7 +174,7 @@ def list_directory(path: Annotated[str, Field(description="The virtual path of t
 
 
 @mcp.tool
-def directory_tree(path: Annotated[str, Field(description="The virtual path of the root directory for the tree listing.")]) -> str:
+def directory_tree(path: Annotated[str, "The virtual path of the root directory for the tree listing."]) -> str:
     """Show a recursive directory listing starting from the given path."""
     try:
         return list_files_recursive(path)
@@ -192,9 +184,9 @@ def directory_tree(path: Annotated[str, Field(description="The virtual path of t
 
 @mcp.tool
 def search_files(
-    path: Annotated[str, Field(description="The virtual path of the directory to start the search from.")],
-    pattern: Annotated[Optional[str], Field(description="A glob pattern to filter file and directory names (e.g., '*.py').")] = None,
-    excludePatterns: Annotated[Optional[List[str]], Field(description="A list of glob patterns to exclude files or directories.")] = None,
+    path: Annotated[str, "The virtual path of the directory to start the search from."],
+    pattern: Annotated[str, "A glob pattern to filter file and directory names (e.g., '*.py')."] = None,
+    excludePatterns: Annotated[list[str], "A list of glob patterns to exclude files or directories."] = None,
 ) -> str:
     """Search for files and directories by name pattern, with optional exclusions."""
     try:
@@ -204,7 +196,7 @@ def search_files(
 
 
 @mcp.tool
-def get_file_info(path: Annotated[str, Field(description="The virtual path of the file or directory to get information about.")]) -> str:
+def get_file_info(path: Annotated[str, "The virtual path of the file or directory to get information about."]) -> str:
     """Get metadata for a file or directory, such as size, modification times, and permissions."""
     try:
 

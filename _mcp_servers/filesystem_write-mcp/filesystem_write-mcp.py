@@ -1,29 +1,25 @@
-from collections import deque
-from datetime import datetime
-import difflib
-import fnmatch
 from fastmcp import FastMCP
 import os
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import ValidationError
 import re
 import sys
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated
 
 
 # Custom error class
-class CustomFileSystemError(ValueError):
+class CustomError(ValueError):
     """Custom error for filesystem operations."""
 
     pass
 
 
 # Global mappings for directory access
-_allowed_real_dirs: List[str] = []  # Real file system paths
-_virtual_to_real: Dict[str, str] = {}  # Virtual path -> Real path
-_real_to_virtual: Dict[str, str] = {}  # Real path -> Virtual path
+_allowed_real_dirs: list[str] = []  # Real file system paths
+_virtual_to_real: dict[str, str] = {}  # Virtual path -> Real path
+_real_to_virtual: dict[str, str] = {}  # Real path -> Virtual path
 
 
-def set_allowed_dirs(real_dirs: List[str]) -> None:
+def set_allowed_dirs(real_dirs: list[str]) -> None:
     """Configure allowed real directories and map them to virtual paths (e.g., /data/a)."""
     global _allowed_real_dirs, _virtual_to_real, _real_to_virtual
     _allowed_real_dirs = [os.path.abspath(os.path.expanduser(d)) for d in real_dirs]
@@ -39,7 +35,7 @@ def validate_virtual_path(virtual_path: str) -> str:
             real_path = os.path.join(real_dir, relative) if relative else real_dir
             break
     else:
-        raise CustomFileSystemError(f"Not a valid path (List allowed directories for valid paths): {virtual_path}")
+        raise CustomError(f"Not a valid path (List allowed directories for valid paths): {virtual_path}")
 
     real_path = os.path.normpath(os.path.abspath(real_path))
     try:
@@ -59,7 +55,9 @@ def validate_virtual_path(virtual_path: str) -> str:
 def get_error_message(message, virtual_path: str, e: Exception) -> str:
     """Generate a user-friendly error message using the virtual path."""
     virtual_path = virtual_path or "Unknown path"
-    if isinstance(e, FileNotFoundError):
+    if isinstance(e, CustomError):
+        return f"{message}: {e}"
+    elif isinstance(e, FileNotFoundError):
         return f"{message}: No such file or directory: {virtual_path}"
     elif isinstance(e, PermissionError):
         return f"{message}: Permission denied: {virtual_path}"
@@ -69,8 +67,6 @@ def get_error_message(message, virtual_path: str, e: Exception) -> str:
         return f"{message}: Not a directory: {virtual_path}"
     elif isinstance(e, FileExistsError):
         return f"{message}: File already exists: {virtual_path}"
-    elif isinstance(e, CustomFileSystemError):
-        return f"{message}: {e}"
     elif isinstance(e, ValidationError):
         errors = e.errors()
         error_details = "; ".join(f"{err['loc'][0]}: {err['msg']}" for err in errors)
@@ -90,8 +86,8 @@ mcp = FastMCP(
 
 @mcp.tool
 def write_file(
-    path: Annotated[str, Field(description="The virtual path of the file to write to. If the file exists, it will be overwritten.")],
-    content: Annotated[str, Field(description="The content to write to the file.")],
+    path: Annotated[str, "The virtual path of the file to write to. If the file exists, it will be overwritten."],
+    content: Annotated[str, "The content to write to the file."],
 ) -> str:
     """Write or overwrite a file with the given text content."""
     try:
@@ -104,7 +100,7 @@ def write_file(
 
 
 @mcp.tool
-def create_directory(path: Annotated[str, Field(description="The virtual path of the directory to create. It can be nested (e.g., /data/a/new/dir).")]) -> str:
+def create_directory(path: Annotated[str, "The virtual path of the directory to create. It can be nested (e.g., /data/a/new/dir)."]) -> str:
     """Create a directory, including any necessary parent directories."""
     try:
         real_path = validate_virtual_path(path)
@@ -118,17 +114,17 @@ def _apply_simplified_patch(original_content: str, diff: str):
     """
     Applies a simplified patch format to a string content.
     Returns a tuple of (new_content, report_string).
-    Raises ValueError if the patch cannot be applied.
+    Raises CustomError if the patch cannot be applied.
     """
     warnings = []
     original_lines = original_content.splitlines()
 
     # Parse the diff into segments
     diff_lines = diff.strip().split("\n")
-    segment_start_indices = [i for i, line in enumerate(diff_lines) if line.startswith("---")]
+    segment_start_indices = [i for i, line in enumerate(diff_lines) if line.startswith("###")]
 
     if not segment_start_indices:
-        raise ValueError("Invalid patch format: no segment separators '---' found.")
+        raise CustomError("Invalid patch format: no segment separators '###' found.")
 
     segments = []
     for i in range(len(segment_start_indices)):
@@ -185,7 +181,7 @@ def _apply_simplified_patch(original_content: str, diff: str):
                     break
 
         if found_at == -1:
-            raise ValueError(f"Patch segment {i + 1} could not be applied.")
+            raise CustomError(f"Patch segment {i + 1} could not be applied.")
 
         # Apply the patch
         new_lines[found_at : found_at + len(segment["from_lines"])] = segment["to_lines"]
@@ -201,15 +197,15 @@ def _apply_simplified_patch(original_content: str, diff: str):
 
 @mcp.tool
 def apply_diff(
-    path: Annotated[str, Field(description="The virtual path of the file to patch.")],
-    diff: Annotated[str, Field(description="The simplified diff to apply to the file.")],
-    dry_run: Annotated[bool, Field(description="If true, only check if the patch would apply cleanly, without modifying the file.")] = False,
+    path: Annotated[str, "The virtual path of the file to patch."],
+    diff: Annotated[str, "The simplified diff to apply to the file."],
+    dry_run: Annotated[bool, "If true, only check if the patch would apply cleanly, without modifying the file."] = False,
 ) -> str:
-    """Apply a simplified patch format to a file. The format is composed of segments separated by '---'. Each segment starts with a header line like '--- ---' or '--- line >= x ---'. The 'line >= x' in the header is optional and tells the patch tool to start searching for the patch location from line number x. Segments must directly follow each other without separating empty lines.
+    """Apply a simplified patch format to a file. The format is composed of segments separated by '###'. Each segment starts with a header line like '### ###' or '### line >= x ###'. The 'line >= x' in the header is optional and tells the patch tool to start searching for the patch location from line number x. Segments must directly follow each other without separating empty lines.
     Within each segment: Lines starting with '-' are lines to be removed. Lines starting with '+' are lines to be added. Lines starting with ' ' are context lines, which must match the original file.
     The patch is applied sequentially. Each segment is searched for and applied in order, starting from the end of the previous segment, or if line >= x is higher than the line number of the end of the previous segment, the next line to replace is searched from that line downwards.
     Example of a patch segment:
-    --- line >= 3 ---
+    ### line >= 3 ###
     -Beneath the velvet cloak of night so deep,
     +Under the velvet cloak of night so deep,
      Where stars like silver needles stitch the sky,
@@ -234,8 +230,8 @@ def apply_diff(
 
 @mcp.tool
 def move_file(
-    source: Annotated[str, Field(description="The virtual path of the file or directory to move.")],
-    destination: Annotated[str, Field(description="The new virtual path for the file or directory.")],
+    source: Annotated[str, "The virtual path of the file or directory to move."],
+    destination: Annotated[str, "The new virtual path for the file or directory."],
 ) -> str:
     """Move or rename a file or directory. This operation will fail if the destination already exists."""
     try:

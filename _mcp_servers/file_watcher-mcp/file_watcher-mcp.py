@@ -2,16 +2,17 @@ from fastmcp import FastMCP
 import os
 import sys
 import time
-from pydantic import Field
 from typing import Annotated, Optional
 
 # Global variable for the watched directory
 _watched_dir: Optional[str] = None
 
+
 def set_watched_dir(real_dir: str) -> None:
     """Configure the watched directory."""
     global _watched_dir
     _watched_dir = os.path.abspath(os.path.expanduser(real_dir))
+
 
 # Server setup
 mcp = FastMCP(
@@ -22,8 +23,8 @@ mcp = FastMCP(
 
 @mcp.tool
 def wait_for_and_read_file(
-    filename: Annotated[str, Field(description="The name of the file to wait for in the watched directory.")],
-    timeout: Annotated[Optional[str], Field(description="The maximum number of seconds to wait for the file.")] = "60",
+    filename: Annotated[str, "The name of the file to wait for in the watched directory."],
+    timeout: Annotated[str, "The maximum number of seconds to wait for the file."] = "60",
 ) -> str:
     """
     Waits for a specific file to appear in the watched directory, reads its content,
@@ -40,7 +41,6 @@ def wait_for_and_read_file(
             timeout_seconds = int(timeout)
         except (ValueError, TypeError):
             pass
-
 
     start_time = time.time()
     while not os.path.exists(file_path):
