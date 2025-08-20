@@ -7,7 +7,7 @@
 import { log, triggerError } from './logger.js';
 import { parseFunctionCalls, escapeXml } from './parsers.js';
 import { hooks } from '../hooks.js';
-import * as UIManager from './ui-manager.js';
+import * as UIManager from '../ui-manager.js';
 
 /**
  * Processes tool calls found in a message, filters them, executes them,

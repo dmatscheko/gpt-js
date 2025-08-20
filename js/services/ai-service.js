@@ -161,7 +161,7 @@ class AIService {
             if (lastMessage && lastMessage.value !== null) {
                 lastMessage.cache = null; // Clear cache since we are done
                 lastMessage.metadata = { model: mergedSettings.model, temperature: mergedSettings.temperature, top_p: mergedSettings.top_p };
-                hooks.onMessageComplete.forEach(fn => fn(lastMessage, targetChatlog, null));
+                hooks.onMessageComplete.forEach(fn => fn(lastMessage, targetChatlog, this.app));
                 const pos = targetChatlog.getMessagePos(lastMessage);
                 UIManager.updateMessageContent(pos, lastMessage); // Final update
             }
