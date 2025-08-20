@@ -388,10 +388,7 @@ class App {
                 this.store.set('controller', new AbortController());
                 const lastMessage = targetChatlog.getLastMessage();
                 if (lastMessage && lastMessage.value === null) {
-                    const lastAlternatives = targetChatlog.getLastAlternatives();
-                    lastAlternatives.messages.pop();
-                    lastAlternatives.activeMessageIndex = lastAlternatives.messages.length - 1;
-                    targetChatlog.notify();
+                    targetChatlog.deleteMessage(lastMessage);
                 } else if (lastMessage) {
                     lastMessage.appendContent('\n\n[Response aborted by user]');
                     lastMessage.cache = null;
