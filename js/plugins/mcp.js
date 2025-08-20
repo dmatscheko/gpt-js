@@ -151,7 +151,7 @@ export const mcpPlugin = {
 
             if (content !== originalContent) {
                 systemMessage.value.content = content;
-                UIManager.renderEntireChat(chatlog);
+                UIManager.renderEntireChat();
             }
 
             return payload;

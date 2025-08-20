@@ -55,8 +55,7 @@ export async function processToolCalls(message, chatlog, app, filterCallback, ex
         content = content.slice(0, pos.start) + startTag + content.slice(gtIndex + 1);
     }
     message.value.content = content;
-    const messagePos = chatlog.getMessagePos(message);
-    UIManager.updateMessageContent(messagePos, message);
+    UIManager.updateMessage(message);
 
     let toolContents = '';
     toolResults.forEach((tr, i) => {
@@ -67,12 +66,8 @@ export async function processToolCalls(message, chatlog, app, filterCallback, ex
     });
 
     if (toolContents) {
-        const toolMessage = chatlog.addMessage({ role: 'tool', content: toolContents });
-        UIManager.addMessage(toolMessage, chatlog, chatlog.getMessagePos(toolMessage));
-
-        const assistantMsg = chatlog.addMessage(null);
-        UIManager.addMessage(assistantMsg, chatlog, chatlog.getMessagePos(assistantMsg));
-
+        UIManager.addMessage({ role: 'tool', content: toolContents });
+        UIManager.addMessage({ role: 'assistant', content: null });
         hooks.onGenerateAIResponse.forEach(fn => fn({}, chatlog));
     }
 }

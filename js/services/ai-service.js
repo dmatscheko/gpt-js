@@ -119,8 +119,7 @@ class AIService {
                 log(5, 'AIService: Received chunk', delta);
                 hooks.onChunkReceived.forEach(fn => fn(delta));
                 targetMessage.appendContent(delta);
-                const pos = targetChatlog.getMessagePos(targetMessage);
-                UIManager.updateMessageContent(pos, targetMessage);
+                UIManager.streamUpdate();
             }
         } catch (error) {
             this.store.set('receiving', false); // Ensure receiving is false on error
@@ -130,14 +129,13 @@ class AIService {
                 this.store.set('controller', new AbortController());
                 const lastMessage = targetChatlog.getLastMessage();
                 if (lastMessage && lastMessage.value === null) {
-                    const lastAlternatives = targetChatlog.getLastAlternatives();
-                    lastAlternatives.messages.pop();
-                    lastAlternatives.activeMessageIndex = lastAlternatives.messages.length - 1;
-                    UIManager.renderEntireChat(targetChatlog);
+                    // Placeholder message was aborted, remove it.
+                    targetChatlog.deleteMessage(lastMessage);
+                    UIManager.renderEntireChat();
                 } else if (lastMessage) {
+                    // A partially streamed message was aborted.
                     lastMessage.appendContent('\n\n[Response aborted by user]');
-                    const pos = targetChatlog.getMessagePos(lastMessage);
-                    UIManager.updateMessageContent(pos, lastMessage);
+                    UIManager.streamUpdate();
                 }
                 return;
             }
@@ -147,12 +145,10 @@ class AIService {
             if (lastMessage.value === null) {
                 lastMessage.value = { role: 'assistant', content: `[Error: ${error.message}. Retry or check connection.]` };
                 hooks.afterMessageAdd.forEach(fn => fn(lastMessage));
-                const pos = targetChatlog.getMessagePos(lastMessage);
-                UIManager.addMessage(lastMessage, targetChatlog, pos);
+                UIManager.renderEntireChat();
             } else {
                 lastMessage.appendContent(`\n\n[Error: ${error.message}. Retry or check connection.]`);
-                const pos = targetChatlog.getMessagePos(lastMessage);
-                UIManager.updateMessageContent(pos, lastMessage);
+                UIManager.streamUpdate();
             }
         } finally {
             this.store.set('receiving', false);
@@ -162,8 +158,7 @@ class AIService {
                 lastMessage.cache = null; // Clear cache since we are done
                 lastMessage.metadata = { model: mergedSettings.model, temperature: mergedSettings.temperature, top_p: mergedSettings.top_p };
                 hooks.onMessageComplete.forEach(fn => fn(lastMessage, targetChatlog, this.app));
-                const pos = targetChatlog.getMessagePos(lastMessage);
-                UIManager.updateMessageContent(pos, lastMessage); // Final update
+                UIManager.streamUpdate(); // Final update
             }
         }
     }

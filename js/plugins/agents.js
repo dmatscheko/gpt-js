@@ -867,9 +867,12 @@ const agentsPlugin = {
                 const endMsgIndex = (toIndex + 1 < userMessageIndices.length) ? userMessageIndices[toIndex + 1] : chMessages.length;
 
                 for (let i = endMsgIndex - 1; i >= startMsgIndex; i--) {
-                    chatlog.deleteNthMessage(i);
+                    const messageToDelete = chatlog.getNthMessage(i);
+                    if (messageToDelete) {
+                        chatlog.deleteMessage(messageToDelete);
+                    }
                 }
-                UIManager.renderEntireChat(chatlog);
+                UIManager.renderEntireChat();
 
                 const nextStep = this.getNextStep(step.id);
                 if (nextStep) {
@@ -921,13 +924,9 @@ const agentsPlugin = {
                 chat.activeAgentId = step.agentId;
                 this.store.set('currentChat', { ...chat });
 
-                const userMsg = chatlog.addMessage({ role: 'user', content: step.prompt });
-                UIManager.addMessage(userMsg, chatlog, chatlog.getMessagePos(userMsg));
-
-                const assistantMessageToBranchFrom = chatlog.addMessage(null);
+                UIManager.addMessage({ role: 'user', content: step.prompt });
+                const assistantMessageToBranchFrom = UIManager.addMessage({ role: 'assistant', content: null });
                 this.multiMessageInfo.messageToBranchFrom = assistantMessageToBranchFrom;
-                UIManager.addMessage(assistantMessageToBranchFrom, chatlog, chatlog.getMessagePos(assistantMessageToBranchFrom));
-
 
                 this.app.aiService.generateResponse(chatlog);
                 break;
@@ -1082,18 +1081,16 @@ const agentsPlugin = {
                 const newPrompt = `${step.prePrompt || ''}\n\n${fullAnswerText}\n\n${step.postPrompt || ''}`;
 
                 if (step.deleteAIAnswer) {
-                    const indicesToDelete = Array.from(messagesToDelete).sort((a, b) => b - a);
-                    for (const index of indicesToDelete) {
-                    chatlog.deleteNthMessage(index);
-                    }
+                    const messagesToDelete = aiAnswerMessages.map(m => chatlog.getNthMessage(m.originalIndex)).filter(Boolean);
 
                     if (step.deleteUserMessage && userMessageIndexToDelete !== -1) {
-                     const userMessage = chatlog.getNthMessage(userMessageIndexToDelete);
+                        const userMessage = chatlog.getNthMessage(userMessageIndexToDelete);
                         if (userMessage && userMessage.value.role === 'user') {
-                        chatlog.deleteNthMessage(userMessageIndexToDelete);
+                            messagesToDelete.push(userMessage);
                         }
                     }
-                UIManager.renderEntireChat(chatlog);
+
+                    messagesToDelete.forEach(msg => UIManager.deleteMessage(msg));
                 }
 
                 chat.activeAgentId = step.agentId;
@@ -1171,7 +1168,7 @@ To call an agent tool, use: <dma:tool_call name="agent_name_agent"><parameter na
                     chat.activeAgentId = step.agentId;
                     agentsPlugin.store.set('currentChat', { ...chat });
                     chatlog.addAlternative(messageToBranchFrom, null);
-                    UIManager.renderEntireChat(chatlog);
+                    UIManager.renderEntireChat();
                     agentsPlugin.app.aiService.generateResponse(chatlog);
                     return;
                 } else {

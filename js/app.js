@@ -177,7 +177,7 @@ class App {
      */
     onChatSwitched(chat) {
         log(3, 'App: onChatSwitched called for chat', chat?.id);
-        UIManager.renderEntireChat(chat?.chatlog || null);
+        UIManager.setChatlog(chat?.chatlog || null);
         if (window.innerWidth <= 1037) {
             document.getElementById('chatListContainer').classList.add('hidden');
         }
@@ -270,11 +270,8 @@ class App {
                 const chatlog = this.store.get('currentChat')?.chatlog;
                 const editingPos = this.store.get('editingPos');
                 if (editingPos !== null) {
-                    const originalMessage = chatlog?.getNthMessage(editingPos);
                     resetEditing(this.store, chatlog);
-                    if (originalMessage) {
-                        UIManager.toggleMessageEditMode(editingPos, false, originalMessage);
-                    }
+                    UIManager.renderEntireChat();
                 }
             }
         });
@@ -322,26 +319,23 @@ class App {
         log(3, 'App: submitUserMessage called with role', userRole);
         const currentChat = this.store.get('currentChat');
         if (!currentChat) return;
-        const currentChatlog = currentChat.chatlog;
 
         const editedPos = this.store.get('editingPos');
         if (editedPos !== null) {
             log(4, 'App: Editing message at pos', editedPos);
-            const msg = currentChatlog.getNthMessage(editedPos);
+            const msg = currentChat.chatlog.getNthMessage(editedPos);
             if (msg) {
                 msg.value.role = userRole;
                 msg.setContent(message.trim());
-                UIManager.updateMessageContent(editedPos, msg);
+                UIManager.renderEntireChat(); // Re-render to show updated content
             }
             this.store.set('editingPos', null);
             document.getElementById('user').checked = true;
 
-            const editedMsg = currentChatlog.getNthMessage(editedPos);
-            if (editedMsg.value.role !== 'assistant' && editedMsg.answerAlternatives === null && currentChatlog.getFirstMessage() !== editedMsg) {
-                const assistantMsg = currentChatlog.addMessage({ role: 'assistant', content: null });
-                const assistantPos = currentChatlog.getMessagePos(assistantMsg);
-                UIManager.addMessage(assistantMsg, currentChatlog, assistantPos);
-                await this.aiService.generateResponse(currentChatlog);
+            const editedMsg = currentChat.chatlog.getNthMessage(editedPos);
+            if (editedMsg.value.role !== 'assistant' && editedMsg.answerAlternatives === null && currentChat.chatlog.getFirstMessage() !== editedMsg) {
+                UIManager.addMessage({ role: 'assistant', content: null });
+                await this.aiService.generateResponse(currentChat.chatlog);
             }
             this.chatService.persistChats();
             return;
@@ -357,9 +351,7 @@ class App {
                 if (result === false) return;
                 if (typeof result === 'string') modifiedContent = result;
             }
-            const newMessage = currentChatlog.addMessage({ role: userRole, content: modifiedContent });
-            const newPos = currentChatlog.getMessagePos(newMessage);
-            UIManager.addMessage(newMessage, currentChatlog, newPos);
+            const newMessage = UIManager.addMessage({ role: userRole, content: modifiedContent });
             hooks.afterMessageAdd.forEach(fn => fn(newMessage));
             this.chatService.persistChats();
             return;
@@ -373,18 +365,13 @@ class App {
                 if (result === false) return;
                 if (typeof result === 'string') modifiedContent = result;
             }
-            const userMessage = currentChatlog.addMessage({ role: userRole, content: modifiedContent });
-            const userPos = currentChatlog.getMessagePos(userMessage);
-            UIManager.addMessage(userMessage, currentChatlog, userPos);
+            const userMessage = UIManager.addMessage({ role: userRole, content: modifiedContent });
             hooks.afterMessageAdd.forEach(fn => fn(userMessage));
-
-            const assistantMsg = currentChatlog.addMessage({ role: 'assistant', content: null });
-            const assistantPos = currentChatlog.getMessagePos(assistantMsg);
-            UIManager.addMessage(assistantMsg, currentChatlog, assistantPos);
+            UIManager.addMessage({ role: 'assistant', content: null });
         }
 
         this.store.set('regenerateLastAnswer', false);
-        await this.aiService.generateResponse(currentChatlog);
+        await this.aiService.generateResponse(currentChat.chatlog);
         this.chatService.persistChats();
     }
 }

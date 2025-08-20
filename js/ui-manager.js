@@ -9,6 +9,7 @@ import { hooks } from './hooks.js';
 
 let chatContainer;
 let appInstance;
+let currentChatlog;
 
 /**
  * Initializes the UI manager with the main chat container and app instance.
@@ -22,22 +23,31 @@ export function init(container, app) {
 }
 
 /**
- * Renders an entire chatlog from scratch, clearing the existing view.
- * @param {import('./components/chatlog.js').Chatlog} chatlog - The chatlog to render.
+ * Sets the active chatlog for the UI manager and triggers a re-render.
+ * @param {import('./components/chatlog.js').Chatlog | null} newChatlog - The new chatlog.
  */
-export function renderEntireChat(chatlog) {
+export function setChatlog(newChatlog) {
+    currentChatlog = newChatlog;
+    renderEntireChat();
+}
+
+
+/**
+ * Renders an entire chatlog from scratch, clearing the existing view.
+ */
+export function renderEntireChat() {
     log(4, 'UIManager: renderEntireChat called');
     if (!chatContainer) {
         log(1, 'UIManager: Not initialized. Call init() first.');
         return;
     }
-    if (!chatlog) {
+    if (!currentChatlog) {
         chatContainer.innerHTML = '';
         return;
     }
 
     const fragment = document.createDocumentFragment();
-    let alternative = chatlog.rootAlternatives;
+    let alternative = currentChatlog.rootAlternatives;
     let lastRole = 'assistant';
     let pos = 0;
 
@@ -50,17 +60,17 @@ export function renderEntireChat(chatlog) {
 
         if (!message.value) {
             const role = lastRole === 'assistant' ? 'user' : 'assistant';
-            const messageEl = _formatMessage({ value: { role, content: '🤔...' } }, pos, msgIdx, msgCnt, chatlog);
+            const messageEl = _formatMessage({ value: { role, content: '🤔...' } }, pos, msgIdx, msgCnt, currentChatlog);
             fragment.appendChild(messageEl);
             break;
         }
         if (message.value.content === null) {
-            const messageEl = _formatMessage({ value: { role: message.value.role, content: '🤔...' } }, pos, msgIdx, msgCnt, chatlog);
+            const messageEl = _formatMessage({ value: { role: message.value.role, content: '🤔...' } }, pos, msgIdx, msgCnt, currentChatlog);
             fragment.appendChild(messageEl);
             break;
         }
 
-        const messageEl = _formatMessage(message, pos, msgIdx, msgCnt, chatlog);
+        const messageEl = _formatMessage(message, pos, msgIdx, msgCnt, currentChatlog);
         fragment.appendChild(messageEl);
 
         lastRole = message.value.role;
@@ -150,28 +160,25 @@ function _formatMessage(message, pos, msgIdx, msgCnt, chatlog) {
 
 
 /**
- * Adds a single message to the DOM at a specific position.
- * @param {import('./components/chatlog.js').Message} message - The message object to render.
- * @param {import('./components/chatlog.js').Chatlog} chatlog - The chatlog the message belongs to.
- * @param {number} position - The position (index) to insert the message at.
+ * Adds a new message to the chatlog and the DOM.
+ * @param {object} messageValue - The value of the message to add (e.g., {role: 'user', content: '...'})
+ * @returns {import('./components/chatlog.js').Message} The newly created message object.
  */
-export function addMessage(message, chatlog, position) {
-    log(4, 'UIManager: addMessage called for position', position);
-    if (!chatContainer) {
-        log(1, 'UIManager: Not initialized. Call init() first.');
-        return;
-    }
-    // For simplicity, we find the alternatives and active index again.
-    // This could be optimized by passing them in.
-    const alternatives = chatlog.getNthAlternatives(position);
-    if (!alternatives) return;
+export function addMessage(messageValue) {
+    log(4, 'UIManager: addMessage called with value', messageValue);
+    if (!currentChatlog || !chatContainer) return null;
+
+    const newMessage = currentChatlog.addMessage(messageValue);
+    const position = currentChatlog.getMessagePos(newMessage);
+
+    const alternatives = currentChatlog.getNthAlternatives(position);
+    if (!alternatives) return null;
 
     const msgIdx = alternatives.activeMessageIndex;
     const msgCnt = alternatives.messages.length;
 
-    const messageEl = _formatMessage(message, position, msgIdx, msgCnt, chatlog);
+    const messageEl = _formatMessage(newMessage, position, msgIdx, msgCnt, currentChatlog);
 
-    // If there's already an element at this position (e.g., the '🤔...' bubble), replace it.
     const existingEl = chatContainer.querySelector(`.message[data-pos="${position}"]`);
     if (existingEl) {
         existingEl.replaceWith(messageEl);
@@ -179,30 +186,48 @@ export function addMessage(message, chatlog, position) {
         chatContainer.appendChild(messageEl);
     }
     chatContainer.parentElement.scrollTop = chatContainer.parentElement.scrollHeight;
+    return newMessage;
 }
 
 /**
- * Removes a message from the DOM at a specific position.
- * @param {number} position - The position (index) of the message to remove.
+ * Deletes a message from the chatlog and the DOM.
+ * @param {import('./components/chatlog.js').Message} message - The message object to remove.
  */
-export function removeMessage(position) {
-    log(4, 'UIManager: removeMessage called for position', position);
-    if (!chatContainer) return;
+export function deleteMessage(message) {
+    log(4, 'UIManager: deleteMessage called for', message);
+    if (!currentChatlog) return;
+    currentChatlog.deleteMessage(message);
+    renderEntireChat();
+}
+
+/**
+ * Updates the content of the last message in the DOM during streaming.
+ */
+export function updateMessage(message) {
+    if (!currentChatlog || !chatContainer) return;
+    const position = currentChatlog.getMessagePos(message);
+    if (position === -1) return;
+
     const messageEl = chatContainer.querySelector(`.message[data-pos="${position}"]`);
-    if (messageEl) {
-        messageEl.remove();
-    }
+    if (!messageEl) return;
+
+    const alternatives = currentChatlog.getNthAlternatives(position);
+    if (!alternatives) return;
+    const msgIdx = alternatives.activeMessageIndex;
+    const msgCnt = alternatives.messages.length;
+
+    const newMessageEl = _formatMessage(message, position, msgIdx, msgCnt);
+    messageEl.replaceWith(newMessageEl);
 }
 
-/**
- * Updates the content of an existing message in the DOM.
- * @param {number} position - The position (index) of the message to update.
- * @param {import('./components/chatlog.js').Message} message - The message object with the updated content.
- */
-export function updateMessageContent(position, message) {
-    log(5, 'UIManager: updateMessageContent called for position', position);
-    if (!chatContainer) return;
+export function streamUpdate() {
+    log(5, 'UIManager: streamUpdate called');
+    if (!currentChatlog || !chatContainer) return;
 
+    const lastMessage = currentChatlog.getLastMessage();
+    if (!lastMessage) return;
+
+    const position = currentChatlog.getMessagePos(lastMessage);
     const messageEl = chatContainer.querySelector(`.message[data-pos="${position}"]`);
     if (!messageEl) return;
 
@@ -215,10 +240,12 @@ export function updateMessageContent(position, message) {
         messageEl.appendChild(contentWrapper);
     }
 
-    // Re-run formatting logic
-    const formattedContent = _formatContent(message.value.content, message, position);
+    const formattedContent = _formatContent(lastMessage.value.content, lastMessage, position);
     if (formattedContent) {
-        contentWrapper.replaceWith(formattedContent);
+        const currentContent = messageEl.querySelector('.content');
+        if (currentContent) {
+            currentContent.replaceWith(formattedContent);
+        }
     }
 
     if (shouldScrollDown) {
@@ -228,14 +255,14 @@ export function updateMessageContent(position, message) {
 
 /**
  * Toggles the visual state of a message to indicate editing.
- * @param {number} position - The position (index) of the message.
+ * @param {import('./components/chatlog.js').Message} message - The message to toggle.
  * @param {boolean} isEditing - True if the message is being edited.
- * @param {import('./components/chatlog.js').Message} originalMessage - The original message data to restore if needed.
  */
-export function toggleMessageEditMode(position, isEditing, originalMessage) {
-    log(4, 'UIManager: toggleMessageEditMode called for position', position);
-    if (!chatContainer) return;
+export function toggleMessageEditMode(message, isEditing) {
+    log(4, 'UIManager: toggleMessageEditMode called for', message);
+    if (!currentChatlog || !chatContainer) return;
 
+    const position = currentChatlog.getMessagePos(message);
     const messageEl = chatContainer.querySelector(`.message[data-pos="${position}"]`);
     if (!messageEl) return;
 
@@ -245,7 +272,7 @@ export function toggleMessageEditMode(position, isEditing, originalMessage) {
             contentWrapper.innerHTML = '🤔...';
         }
     } else {
-        // Restore the original content by re-rendering
-        updateMessageContent(position, originalMessage);
+        // Restore the original content by re-rendering the whole chat
+        renderEntireChat();
     }
 }
