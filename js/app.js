@@ -16,14 +16,14 @@ import { resetEditing } from './utils/chat.js';
 import { showLogin, showLogout } from './utils/ui.js';
 import { exportJson, importJson } from './utils/shared.js';
 import { hooks, registerPlugin } from './hooks.js';
-import { formattingPlugins } from './plugins/formatting.js';
+// import { formattingPlugins } from './plugins/formatting.js';
 import { alternativeNavigationPlugin, messageModificationPlugin } from './plugins/ui-controls.js';
-import { avatarsPlugin } from './plugins/avatars.js';
+// import { avatarsPlugin } from './plugins/avatars.js';
 import { mcpPlugin } from './plugins/mcp.js';
-import { errorBubblePlugin } from './plugins/error-bubble.js';
+// import { errorBubblePlugin } from './plugins/error-bubble.js';
 import { agentsPlugin } from './plugins/agents.js';
 import { modelParamsPlugin } from './plugins/model-params.js';
-import { maximizePlugin } from './plugins/maximize-view.js';
+// import { maximizePlugin } from './plugins/maximize-view.js';
 import { startMessage, messageSubmit, messageStop, defaultEndpoint } from './config.js';
 
 /**
@@ -111,13 +111,13 @@ class App {
     registerPlugins() {
         registerPlugin(agentsPlugin, this);
         registerPlugin(mcpPlugin, this);
-        formattingPlugins.forEach(plugin => registerPlugin(plugin, this));
+        // formattingPlugins.forEach(plugin => registerPlugin(plugin, this));
         registerPlugin(alternativeNavigationPlugin, this);
         registerPlugin(messageModificationPlugin, this);
-        registerPlugin(avatarsPlugin, this);
-        registerPlugin(errorBubblePlugin, this);
+        // registerPlugin(avatarsPlugin, this);
+        // registerPlugin(errorBubblePlugin, this);
         registerPlugin(modelParamsPlugin, this);
-        registerPlugin(maximizePlugin, this);
+        // registerPlugin(maximizePlugin, this);
     }
 
     /**
