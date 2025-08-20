@@ -6,11 +6,12 @@
 
 import Store from './state/store.js';
 import ApiService from './services/api-service.js';
+import AIService from './services/ai-service.js';
 import ChatService from './services/chat-service.js';
 import ConfigService from './services/config-service.js';
 import SettingsPanel from './components/settings-panel.js';
-import { ChatBox } from './components/chatbox.js';
 import ChatListView from './components/chatlist-view.js';
+import * as UIManager from './ui-manager.js';
 import { log, triggerError } from './utils/logger.js';
 import { resetEditing } from './utils/chat.js';
 import { showLogin, showLogout } from './utils/ui.js';
@@ -53,6 +54,7 @@ class App {
 
         this.configService = new ConfigService(this.store);
         this.apiService = new ApiService(this.store);
+        this.aiService = new AIService(this.store, this.configService, this.apiService);
         this.chatService = new ChatService(this.store, this.configService);
 
         this.settingsPanel = new SettingsPanel({
@@ -66,7 +68,7 @@ class App {
             onTitleEdited: (chatId, newTitle) => this.chatService.updateChatTitle(chatId, newTitle),
         });
 
-        this.ui.chatBox = new ChatBox(this.store);
+        this.ui.chatBox = null; // Will be replaced by UIManager
 
         this.store.subscribe('receiving', (val) => {
             this.ui.submitButton.innerHTML = val ? messageStop : messageSubmit;
@@ -80,7 +82,7 @@ class App {
         if (window.innerWidth <= 1037) {
             document.getElementById('chatListContainer').classList.add('hidden');
         }
-        hooks.onGenerateAIResponse.push((options, chatlog) => this.generateAIResponse(options, chatlog));
+        hooks.onGenerateAIResponse.push((options, chatlog) => this.aiService.generateResponse(chatlog, options));
     }
 
     /**
@@ -88,10 +90,12 @@ class App {
      */
     async init() {
         log(3, 'App: init called');
+        UIManager.init(document.getElementById('chat'));
         this.registerPlugins();
         this.setupGlobalErrorHandlers();
 
-        this.ui.chatBox.onUpdate = () => this.chatService.persistChats();
+        // The UIManager does not have an onUpdate callback. Persisting will be handled explicitly.
+        // this.ui.chatBox.onUpdate = () => this.chatService.persistChats();
 
         this.chatService.init();
 
@@ -173,7 +177,7 @@ class App {
      */
     onChatSwitched(chat) {
         log(3, 'App: onChatSwitched called for chat', chat?.id);
-        this.ui.chatBox.setChatlog(chat?.chatlog || null);
+        UIManager.renderEntireChat(chat?.chatlog || null);
         if (window.innerWidth <= 1037) {
             document.getElementById('chatListContainer').classList.add('hidden');
         }
@@ -257,8 +261,21 @@ class App {
         });
         document.addEventListener('keydown', event => {
             if (event.key === 'Escape') {
+                // Abort any ongoing fetch request.
                 this.store.get('controller').abort();
-                resetEditing(this.store, this.ui.chatBox.chatlog, this.ui.chatBox);
+                // Immediately create a new controller for the next request.
+                this.store.set('controller', new AbortController());
+
+                // Handle UI reset for editing.
+                const chatlog = this.store.get('currentChat')?.chatlog;
+                const editingPos = this.store.get('editingPos');
+                if (editingPos !== null) {
+                    const originalMessage = chatlog?.getNthMessage(editingPos);
+                    resetEditing(this.store, chatlog);
+                    if (originalMessage) {
+                        UIManager.toggleMessageEditMode(editingPos, false, originalMessage);
+                    }
+                }
             }
         });
         this.ui.newChatButton.addEventListener('click', () => {
@@ -295,134 +312,6 @@ class App {
         });
     }
 
-    /**
-     * Generates an AI response.
-     * @param {Object} [options={}] - Options for the generation.
-     * @param {Chatlog} [targetChatlog=this.chatlog] - The chatlog to generate a response for.
-     */
-    async generateAIResponse(options = {}, targetChatlog = this.ui.chatBox.chatlog) {
-        log(3, 'App: generateAIResponse called');
-        if (this.store.get('receiving')) return;
-
-        // 1. Get settings from all scopes
-        const globalSettings = this.configService.getModelSettings();
-        const currentChat = this.store.get('currentChat');
-        const chatSettings = currentChat?.modelSettings || {};
-
-        let agentSettings = {};
-        const activeAgentId = currentChat?.activeAgentId;
-        if (activeAgentId) {
-            const agent = currentChat.agents.find(a => a.id === activeAgentId);
-            if (agent && agent.useCustomModelSettings) {
-                agentSettings = agent.modelSettings || {};
-            }
-        }
-
-        // 2. Merge settings (agent > chat > global > options)
-        const mergedSettings = { ...globalSettings, ...chatSettings, ...agentSettings, ...options };
-
-        if (!mergedSettings.model) {
-            log(2, 'App: No model selected');
-            triggerError('Please select a model.');
-            return;
-        }
-
-        this.store.set('receiving', true);
-        const targetMessage = targetChatlog.getLastMessage();
-        try {
-            let payload = {
-                messages: targetChatlog.getActiveMessageValues().filter(m => m.content !== null),
-                stream: true
-            };
-
-            // 3. Apply settings to payload via hook
-            hooks.onModelSettings.forEach(fn => fn(payload, mergedSettings));
-
-            // Don't send a request if there are no messages or only a system prompt.
-            if (payload.messages.length === 0) return;
-            if (payload.messages.length === 1 && payload.messages[0]?.role === 'system') return;
-
-            if (payload.messages[0]?.role === 'system') {
-                let systemContent = payload.messages[0].content;
-                for (let fn of hooks.onModifySystemPrompt) {
-                    systemContent = fn(systemContent) || systemContent;
-                }
-                payload.messages[0].content = systemContent;
-            }
-            payload = hooks.beforeApiCall.reduce((p, fn) => fn(p, this.ui.chatBox) || p, payload);
-
-            const endpoint = this.configService.getItem('endpoint', defaultEndpoint)
-            const apiKey = this.configService.getItem('apiKey', '');
-            const abortSignal = this.store.get('controller').signal;
-            const reader = await this.apiService.streamAPIResponse(payload, endpoint, apiKey, abortSignal);
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const valueStr = new TextDecoder().decode(value);
-                if (valueStr.startsWith('{')) {
-                    const data = JSON.parse(valueStr);
-                    if (data.error) throw new Error(data.error.message);
-                }
-                const chunks = valueStr.split('\n');
-                let delta = '';
-                chunks.forEach(chunk => {
-                    if (!chunk.startsWith('data: ')) return;
-                    chunk = chunk.substring(6);
-                    if (chunk === '' || chunk === '[DONE]') return;
-                    const data = JSON.parse(chunk);
-                    if (data.error) throw new Error(data.error.message);
-                    delta += data.choices[0].delta.content || '';
-                });
-                if (delta === '') continue;
-                log(5, 'App: Received chunk', delta);
-                hooks.onChunkReceived.forEach(fn => fn(delta));
-                targetMessage.appendContent(delta);
-                targetChatlog.notify();
-            }
-        } catch (error) {
-            this.store.set('receiving', false); // Ensure receiving is false on error
-            if (error.name === 'AbortError') {
-                log(3, 'App: Response aborted');
-                hooks.onCancel.forEach(fn => fn());
-                this.store.set('controller', new AbortController());
-                const lastMessage = targetChatlog.getLastMessage();
-                if (lastMessage && lastMessage.value === null) {
-                    const lastAlternatives = targetChatlog.getLastAlternatives();
-                    lastAlternatives.messages.pop();
-                    lastAlternatives.activeMessageIndex = lastAlternatives.messages.length - 1;
-                    targetChatlog.notify();
-                } else if (lastMessage) {
-                    lastMessage.appendContent('\n\n[Response aborted by user]');
-                    lastMessage.cache = null;
-                }
-                return;
-            }
-            log(1, 'App: generateAIResponse error', error);
-            triggerError(error.message);
-            const lastMessage = targetChatlog.getLastMessage();
-            if (lastMessage.value === null) {
-                lastMessage.value = { role: 'assistant', content: `[Error: ${error.message}. Retry or check connection.]` };
-                hooks.afterMessageAdd.forEach(fn => fn(lastMessage));
-            } else {
-                lastMessage.appendContent(`\n\n[Error: ${error.message}. Retry or check connection.]`);
-            }
-            lastMessage.cache = null;
-        } finally {
-            // Set receiving to false before calling hooks, in case a hook triggers another generation
-            this.store.set('receiving', false);
-            const lastMessage = targetChatlog.getLastMessage();
-
-            // Set metadata here so hooks can use it
-            if (lastMessage && lastMessage.value !== null) {
-                lastMessage.cache = null;
-                lastMessage.metadata = { model: mergedSettings.model, temperature: mergedSettings.temperature, top_p: mergedSettings.top_p };
-                hooks.onMessageComplete.forEach(fn => fn(lastMessage, targetChatlog, this.ui.chatBox));
-            }
-            targetChatlog.notify();
-            this.chatService.persistChats();
-        }
-    }
 
     /**
      * Submits a user message.
@@ -431,34 +320,34 @@ class App {
      */
     async submitUserMessage(message, userRole) {
         log(3, 'App: submitUserMessage called with role', userRole);
-        // Ensure we are acting on the chatlog instance currently displayed in the UI
-        const currentChatlog = this.ui.chatBox.chatlog;
-        if (!currentChatlog) return;
+        const currentChat = this.store.get('currentChat');
+        if (!currentChat) return;
+        const currentChatlog = currentChat.chatlog;
 
         const editedPos = this.store.get('editingPos');
-        log(4, 'App: editingPos is', editedPos);
         if (editedPos !== null) {
             log(4, 'App: Editing message at pos', editedPos);
             const msg = currentChatlog.getNthMessage(editedPos);
             if (msg) {
                 msg.value.role = userRole;
                 msg.setContent(message.trim());
-                msg.cache = null;
-                this.ui.chatBox.update();
+                UIManager.updateMessageContent(editedPos, msg);
             }
             this.store.set('editingPos', null);
             document.getElementById('user').checked = true;
+
             const editedMsg = currentChatlog.getNthMessage(editedPos);
             if (editedMsg.value.role !== 'assistant' && editedMsg.answerAlternatives === null && currentChatlog.getFirstMessage() !== editedMsg) {
-                currentChatlog.addMessage({ role: 'assistant', content: null });
-                this.ui.chatBox.update();
-                await this.generateAIResponse({}, currentChatlog);
+                const assistantMsg = currentChatlog.addMessage({ role: 'assistant', content: null });
+                const assistantPos = currentChatlog.getMessagePos(assistantMsg);
+                UIManager.addMessage(assistantMsg, currentChatlog, assistantPos);
+                await this.aiService.generateResponse(currentChatlog);
             }
+            this.chatService.persistChats();
             return;
         }
 
         if (!this.store.get('regenerateLastAnswer') && !message) return;
-        // Allow flow to submit messages even if another response is being generated
         if (this.store.get('receiving') && !agentsPlugin.flowRunning) return;
 
         if (userRole === 'assistant') {
@@ -469,8 +358,10 @@ class App {
                 if (typeof result === 'string') modifiedContent = result;
             }
             const newMessage = currentChatlog.addMessage({ role: userRole, content: modifiedContent });
+            const newPos = currentChatlog.getMessagePos(newMessage);
+            UIManager.addMessage(newMessage, currentChatlog, newPos);
             hooks.afterMessageAdd.forEach(fn => fn(newMessage));
-            this.ui.chatBox.update();
+            this.chatService.persistChats();
             return;
         }
 
@@ -482,18 +373,19 @@ class App {
                 if (result === false) return;
                 if (typeof result === 'string') modifiedContent = result;
             }
-            const newMessage = currentChatlog.addMessage({ role: userRole, content: modifiedContent });
-            hooks.afterMessageAdd.forEach(fn => fn(newMessage));
-            currentChatlog.addMessage(null);
+            const userMessage = currentChatlog.addMessage({ role: userRole, content: modifiedContent });
+            const userPos = currentChatlog.getMessagePos(userMessage);
+            UIManager.addMessage(userMessage, currentChatlog, userPos);
+            hooks.afterMessageAdd.forEach(fn => fn(userMessage));
+
+            const assistantMsg = currentChatlog.addMessage({ role: 'assistant', content: null });
+            const assistantPos = currentChatlog.getMessagePos(assistantMsg);
+            UIManager.addMessage(assistantMsg, currentChatlog, assistantPos);
         }
 
         this.store.set('regenerateLastAnswer', false);
-        this.ui.chatBox.update(); // Initial update to show user message
-
-        await this.generateAIResponse({}, currentChatlog);
-
-        // Final update to ensure UI is consistent after response generation, especially for flows.
-        this.ui.chatBox.update();
+        await this.aiService.generateResponse(currentChatlog);
+        this.chatService.persistChats();
     }
 }
 

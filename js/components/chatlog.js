@@ -168,35 +168,6 @@ class Chatlog {
     constructor() {
         log(5, 'Chatlog: Constructor called');
         this.rootAlternatives = null;
-        this.subscribers = [];
-    }
-
-    /**
-     * Subscribes a callback to chatlog changes.
-     * @param {Function} cb - The callback to subscribe.
-     */
-    subscribe(cb) {
-        log(5, 'Chatlog: subscribe called');
-        this.subscribers.push(cb);
-    }
-
-    /**
-     * Unsubscribes a callback from chatlog changes.
-     * @param {Function} cb - The callback to unsubscribe.
-     */
-    unsubscribe(cb) {
-        log(5, 'Chatlog: unsubscribe called');
-        this.subscribers = this.subscribers.filter(s => s !== cb);
-    }
-
-    /**
-     * Notifies all subscribers of a change.
-     * @param {boolean} [scroll=true] - Whether to scroll to the bottom.
-     */
-    notify(scroll = true) {
-        log(5, 'Chatlog: notify called');
-        this.subscribers.forEach(cb => cb(scroll));
-        hooks.onChatUpdated.forEach(fn => fn(this));
     }
 
     /**
@@ -210,17 +181,17 @@ class Chatlog {
         if (!lastMessage) {
             this.rootAlternatives = new Alternatives();
             const msg = this.rootAlternatives.addMessage(value);
-            this.notify();
+            hooks.onChatUpdated.forEach(fn => fn(this));
             return msg;
         }
         if (lastMessage.value === null) {
             lastMessage.value = value;
-            this.notify();
+            hooks.onChatUpdated.forEach(fn => fn(this));
             return lastMessage;
         }
         lastMessage.answerAlternatives = new Alternatives();
         const msg = lastMessage.answerAlternatives.addMessage(value);
-        this.notify();
+        hooks.onChatUpdated.forEach(fn => fn(this));
         return msg;
     }
 
@@ -347,7 +318,7 @@ class Chatlog {
         this.rootAlternatives = buildAlternatives(alternativesData);
         this.clean();
         log(3, 'Chatlog: Loaded with message count', msgCount);
-        this.notify();
+        hooks.onChatUpdated.forEach(fn => fn(this));
     }
 
     /**
@@ -368,7 +339,7 @@ class Chatlog {
             });
         }
         badMessages.forEach(msg => this.deleteMessage(msg));
-        this.notify();
+        hooks.onChatUpdated.forEach(fn => fn(this));
     }
 
     /**
@@ -455,7 +426,7 @@ class Chatlog {
         }
 
         alternatives.clearCache();
-        this.notify();
+        hooks.onChatUpdated.forEach(fn => fn(this));
     }
 
     /**
@@ -479,7 +450,7 @@ class Chatlog {
                 parentMsg.answerAlternatives = childAlternatives;
             }
         }
-        this.notify();
+        hooks.onChatUpdated.forEach(fn => fn(this));
     }
 
     /**
@@ -498,7 +469,7 @@ class Chatlog {
             alternatives.prev();
         }
 
-        this.notify(false);
+        hooks.onChatUpdated.forEach(fn => fn(this));
     }
 
     /**
@@ -513,7 +484,7 @@ class Chatlog {
         if (!alternatives) return null;
 
         const newMessage = alternatives.addMessage(newValue);
-        this.notify();
+        hooks.onChatUpdated.forEach(fn => fn(this));
         return newMessage;
     }
 

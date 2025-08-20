@@ -24,10 +24,10 @@ export function getDatePrompt() {
  * @param {import('../components/chatlog.js').Chatlog} chatlog - The chatlog instance.
  * @param {import('../components/chatbox.js').Chatbox} chatbox - The chatbox instance.
  */
-export function resetEditing(store, chatlog, chatbox) {
+export function resetEditing(store, chatlog) {
     const currentEditingPos = store.get('editingPos');
     if (currentEditingPos !== null) {
-        const prevMsg = chatlog.getNthMessage(currentEditingPos);
+        const prevMsg = chatlog?.getNthMessage(currentEditingPos);
         if (prevMsg) {
             if (prevMsg.value.content === null) {
                 chatlog.deleteMessage(prevMsg); // Discard uncommitted new alternative
@@ -36,40 +36,6 @@ export function resetEditing(store, chatlog, chatbox) {
             }
         }
         store.set('editingPos', null);
-        chatbox.update(false);
+        // The caller is now responsible for updating the UI
     }
-}
-
-/**
- * Adds a new message to the chat log.
- * This is the preferred way to add a message to the chat log.
- * @param {import('../components/chatlog.js').Chatlog} chatlog - The chatlog to add the message to.
- * @param {Object} value - The value of the message to add.
- * @returns {Message} The newly added message.
- */
-export function addMessageToChat(chatlog, value) {
-    log(4, 'addMessageToChat called with value', value);
-    const message = chatlog.addMessage(value);
-    chatlog.notify();
-    return message;
-}
-
-/**
- * Adds a new alternative to an existing message.
- * This is the preferred way to add an alternative message.
- * @param {import('../components/chatlog.js').Chatlog} chatlog - The chatlog instance.
- * @param {Message | null} existingMessage - The message to add an alternative to. If null, the last message is used.
- * @param {Object} newValue - The value for the new alternative message.
- * @returns {Message | null} The newly created alternative message, or null if no target message was found.
- */
-export function addAlternativeToChat(chatlog, existingMessage, newValue) {
-    log(4, 'addAlternativeToChat called for', existingMessage);
-    const targetMessage = existingMessage || chatlog.getLastMessage();
-    if (!targetMessage) {
-        log(2, "addAlternativeToChat: Cannot add alternative, no message found.");
-        return null;
-    }
-    const newMessage = chatlog.addAlternative(targetMessage, newValue);
-    chatlog.notify();
-    return newMessage;
 }
