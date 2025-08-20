@@ -6,6 +6,7 @@
 
 import { log, triggerError } from '../utils/logger.js';
 import { hooks } from '../hooks.js';
+import * as UIManager from '../ui-manager.js';
 import { defaultEndpoint } from '../config.js';
 
 /**

@@ -7,7 +7,7 @@
 import { Chatlog, Alternatives } from '../components/chatlog.js';
 import { firstPrompt } from '../config.js';
 import { log, triggerError } from '../utils/logger.js';
-import { getDatePrompt, resetEditing, addMessageToChat } from '../utils/chat.js';
+import { getDatePrompt, resetEditing } from '../utils/chat.js';
 import { hooks } from '../hooks.js';
 
 /**
@@ -57,7 +57,7 @@ class ChatService {
         const id = Date.now().toString();
         const title = 'New Chat';
         const chatlog = new Chatlog();
-        addMessageToChat(chatlog, { role: 'system', content: firstPrompt + getDatePrompt() });
+        chatlog.addMessage({ role: 'system', content: firstPrompt + getDatePrompt() });
         const newChat = { id, title, chatlog, modelSettings: {}, agents: [], flow: { steps: [], connections: [] } };
         this.chats.push(newChat);
         this.store.set('chats', this.chats);
@@ -73,8 +73,8 @@ class ChatService {
         log(3, 'ChatService: switchChat called for id', id);
         if (this.currentChatId === id) return;
 
-        const ui = this.store.get('ui');
-        resetEditing(this.store, ui.chatBox.chatlog, ui.chatBox);
+        const chatlog = this.store.get('currentChat')?.chatlog;
+        resetEditing(this.store, chatlog);
 
         this.persistChats();
         this.currentChatId = id;
@@ -195,7 +195,7 @@ class ChatService {
                     rootData = parsed.rootAlternatives;
                 } else {
                     const tempLog = new Chatlog();
-                    parsed.forEach(msg => addMessageToChat(tempLog, msg));
+                    parsed.forEach(msg => tempLog.addMessage(msg));
                     rootData = tempLog.toJSON();
                 }
                 const chatlog = new Chatlog();
