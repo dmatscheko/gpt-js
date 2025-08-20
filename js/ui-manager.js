@@ -8,14 +8,17 @@ import { log } from './utils/logger.js';
 import { hooks } from './hooks.js';
 
 let chatContainer;
+let appInstance;
 
 /**
- * Initializes the UI manager with the main chat container.
+ * Initializes the UI manager with the main chat container and app instance.
  * @param {HTMLElement} container - The element where chat messages are displayed.
+ * @param {import('./app.js').default} app - The main application instance.
  */
-export function init(container) {
+export function init(container, app) {
     chatContainer = container;
-    log(4, 'UIManager: Initialized with container', chatContainer);
+    appInstance = app;
+    log(4, 'UIManager: Initialized with container and app instance');
 }
 
 /**
@@ -128,9 +131,8 @@ function _formatMessage(message, pos, msgIdx, msgCnt, chatlog) {
 
     const controlsContainer = document.createElement('span');
     controlsContainer.classList.add('message-controls', 'nobreak');
-    // The last parameter `this` (the chatbox instance) is no longer available.
-    // Hooks might need to be adapted if they rely on it. Passing null for now.
-    hooks.onRenderMessageControls.forEach(fn => fn(controlsContainer, message, chatlog, null));
+    // Pass the app instance to the hooks so they can access the store and other services.
+    hooks.onRenderMessageControls.forEach(fn => fn(controlsContainer, message, chatlog, appInstance));
     msgTitleStrip.appendChild(controlsContainer);
 
     el.appendChild(msgTitleStrip);

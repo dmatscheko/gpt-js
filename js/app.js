@@ -90,7 +90,7 @@ class App {
      */
     async init() {
         log(3, 'App: init called');
-        UIManager.init(document.getElementById('chat'));
+        UIManager.init(document.getElementById('chat'), this);
         this.registerPlugins();
         this.setupGlobalErrorHandlers();
 
