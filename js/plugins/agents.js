@@ -7,7 +7,7 @@
 import { log, triggerError } from '../utils/logger.js';
 import { hooks } from '../hooks.js';
 import { parseFunctionCalls } from '../utils/parsers.js';
-import { addAlternativeToChat } from '../utils/chat.js';
+import * as UIManager from '../ui-manager.js';
 import { createControlButton } from '../utils/ui.js';
 import { processToolCalls, exportJson, importJson } from '../utils/shared.js';
 import { defaultEndpoint } from '../config.js';
@@ -830,7 +830,11 @@ const agentsPlugin = {
         this.currentStepId = step.id;
         const chat = this.store.get('currentChat');
         const type = step.type || 'simple-prompt'; // Default to agent for old steps
-        const chatlog = this.app.ui.chatBox.chatlog;
+        const chatlog = this.store.get('currentChat')?.chatlog;
+        if (!chatlog) {
+            this.stopFlow('Flow stopped: No active chatlog.');
+            return;
+        }
 
         switch (type) {
             case 'simple-prompt':
@@ -843,8 +847,7 @@ const agentsPlugin = {
                 this.app.submitUserMessage(step.prompt, 'user');
                 break;
             case 'clear-history': {
-                const chChatlog = this.app.ui.chatBox.chatlog;
-                const chMessages = chChatlog.getActiveMessageValues();
+                const chMessages = chatlog.getActiveMessageValues();
                 const userMessageIndices = chMessages
                     .map((msg, i) => msg.role === 'user' ? i : -1)
                     .filter(i => i !== -1);
@@ -864,8 +867,9 @@ const agentsPlugin = {
                 const endMsgIndex = (toIndex + 1 < userMessageIndices.length) ? userMessageIndices[toIndex + 1] : chMessages.length;
 
                 for (let i = endMsgIndex - 1; i >= startMsgIndex; i--) {
-                    chChatlog.deleteNthMessage(i);
+                    chatlog.deleteNthMessage(i);
                 }
+                UIManager.renderEntireChat(chatlog);
 
                 const nextStep = this.getNextStep(step.id);
                 if (nextStep) {
@@ -876,7 +880,7 @@ const agentsPlugin = {
                 break;
             }
             case 'branching-prompt':
-                const bpLastMessage = this.app.ui.chatBox.chatlog.getLastMessage()?.value.content || '';
+                const bpLastMessage = chatlog.getLastMessage()?.value.content || '';
                 let bpIsMatch = false;
                 const bpCondition = step.condition || '';
 
@@ -917,14 +921,18 @@ const agentsPlugin = {
                 chat.activeAgentId = step.agentId;
                 this.store.set('currentChat', { ...chat });
 
-                chatlog.addMessage({ role: 'user', content: step.prompt });
+                const userMsg = chatlog.addMessage({ role: 'user', content: step.prompt });
+                UIManager.addMessage(userMsg, chatlog, chatlog.getMessagePos(userMsg));
+
                 const assistantMessageToBranchFrom = chatlog.addMessage(null);
                 this.multiMessageInfo.messageToBranchFrom = assistantMessageToBranchFrom;
+                UIManager.addMessage(assistantMessageToBranchFrom, chatlog, chatlog.getMessagePos(assistantMessageToBranchFrom));
 
-                this.app.generateAIResponse({}, chatlog);
+
+                this.app.aiService.generateResponse(chatlog);
                 break;
             case 'conditional-stop':
-                const lastMessage = this.app.ui.chatBox.chatlog.getLastMessage()?.value.content || '';
+                const lastMessage = chatlog.getLastMessage()?.value.content || '';
                 let isMatch = false;
                 const condition = step.condition || '';
 
@@ -1011,9 +1019,8 @@ const agentsPlugin = {
                 this.app.submitUserMessage(finalPrompt, 'user');
                 break;
             case 'echo-answer': {
-                const rlaChatlog = this.app.ui.chatBox.chatlog;
-                const rlaMessages = rlaChatlog.getActiveMessageValues().map((msg, i) => ({
-                    ...rlaChatlog.getNthMessage(i),
+                const rlaMessages = chatlog.getActiveMessageValues().map((msg, i) => ({
+                    ...chatlog.getNthMessage(i),
                     originalIndex: i
                 }));
 
@@ -1077,15 +1084,16 @@ const agentsPlugin = {
                 if (step.deleteAIAnswer) {
                     const indicesToDelete = Array.from(messagesToDelete).sort((a, b) => b - a);
                     for (const index of indicesToDelete) {
-                        rlaChatlog.deleteNthMessage(index);
+                    chatlog.deleteNthMessage(index);
                     }
 
                     if (step.deleteUserMessage && userMessageIndexToDelete !== -1) {
-                         const userMessage = rlaChatlog.getNthMessage(userMessageIndexToDelete);
+                     const userMessage = chatlog.getNthMessage(userMessageIndexToDelete);
                         if (userMessage && userMessage.value.role === 'user') {
-                            rlaChatlog.deleteNthMessage(userMessageIndexToDelete);
+                        chatlog.deleteNthMessage(userMessageIndexToDelete);
                         }
                     }
+                UIManager.renderEntireChat(chatlog);
                 }
 
                 chat.activeAgentId = step.agentId;
@@ -1148,7 +1156,7 @@ To call an agent tool, use: <dma:tool_call name="agent_name_agent"><parameter na
             }
             return modified;
         },
-        onMessageComplete: async (message, chatlog, chatbox) => {
+        onMessageComplete: async (message, chatlog, app) => {
             if (!message.value) return; // Defend against null message value
             const { toolCalls } = parseFunctionCalls(message.value.content);
 
@@ -1162,8 +1170,9 @@ To call an agent tool, use: <dma:tool_call name="agent_name_agent"><parameter na
                     const chat = agentsPlugin.store.get('currentChat');
                     chat.activeAgentId = step.agentId;
                     agentsPlugin.store.set('currentChat', { ...chat });
-                    addAlternativeToChat(chatlog, messageToBranchFrom, null);
-                    agentsPlugin.app.generateAIResponse({}, chatlog);
+                    chatlog.addAlternative(messageToBranchFrom, null);
+                    UIManager.renderEntireChat(chatlog);
+                    agentsPlugin.app.aiService.generateResponse(chatlog);
                     return;
                 } else {
                     agentsPlugin.multiMessageInfo = { active: false, step: null, counter: 0, messageToBranchFrom: null };
@@ -1175,7 +1184,7 @@ To call an agent tool, use: <dma:tool_call name="agent_name_agent"><parameter na
                 app: agentsPlugin.app,
                 store: agentsPlugin.store,
             };
-            await processToolCalls(message, chatlog, chatbox, filterAgentCalls, executeAgentCall, context);
+            await processToolCalls(message, chatlog, app, filterAgentCalls, executeAgentCall, context);
 
             // --- Flow Continuation ---
             // Re-parse *after* processToolCalls might have added its own messages.
