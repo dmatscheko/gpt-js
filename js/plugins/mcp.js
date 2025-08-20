@@ -7,6 +7,7 @@
 import { log } from '../utils/logger.js';
 import { hooks } from '../hooks.js';
 import { processToolCalls } from '../utils/shared.js';
+import * as UIManager from '../ui-manager.js';
 
 
 /**
@@ -123,14 +124,18 @@ export const mcpPlugin = {
         /**
          * Appends tool descriptions to the system prompt before API calls if MCP is configured.
          * @param {Object} payload - The API payload.
-         * @param {import('../components/chatbox.js').ChatBox} chatbox - The ChatBox instance.
+         * @param {import('../app.js').default} app - The main application instance.
          * @returns {Object} The modified payload.
          */
-        beforeApiCall: function (payload, chatbox) {
+        beforeApiCall: function (payload, app) {
             log(5, 'mcpPlugin: beforeApiCall called');
-            const mcpUrl = this.configService.getItem('mcpServer');
+            if (!app) return payload;
 
-            const systemMessage = chatbox.chatlog.getFirstMessage();
+            const mcpUrl = this.configService.getItem('mcpServer');
+            const chatlog = app.store.get('currentChat')?.chatlog;
+            if (!chatlog) return payload;
+
+            const systemMessage = chatlog.getFirstMessage();
             if (!systemMessage) return payload;
 
             // Always remove the old tools section first
@@ -146,8 +151,7 @@ export const mcpPlugin = {
 
             if (content !== originalContent) {
                 systemMessage.value.content = content;
-                systemMessage.cache = null;
-                chatbox.update();
+                UIManager.renderEntireChat(chatlog);
             }
 
             return payload;
@@ -157,14 +161,14 @@ export const mcpPlugin = {
          * adds tool outputs to chatlog, and auto-continues the assistant response.
          * @param {import('../components/chatlog.js').Message} message - The completed message.
          * @param {import('../components/chatlog.js').Chatlog} chatlog - The chatlog.
-         * @param {import('../components/chatbox.js').ChatBox} chatbox - The ChatBox instance.
+         * @param {import('../app.js').default} app - The main application instance.
          */
-        onMessageComplete: async function (message, chatlog, chatbox) {
+        onMessageComplete: async function (message, chatlog, app) {
             if (!message.value || message.value.role !== 'assistant' || message !== chatlog.getLastMessage()) {
                 return;
             }
             const context = { message, plugin: this }; // Pass message for metadata updates
-            await processToolCalls(message, chatlog, chatbox, this.filterMcpCalls, this.executeMcpCall, context, this.tools);
+            await processToolCalls(message, chatlog, app, this.filterMcpCalls, this.executeMcpCall, context, this.tools);
         },
         /**
          * Replaces citation XML tags with HTML superscript links.

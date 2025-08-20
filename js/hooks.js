@@ -3,14 +3,14 @@
 export const hooks = {
     beforeUserMessageAdd: [], // Called before adding a user/system message to the chatlog. Allows modifying content or cancelling addition. Args: (content, role) => modifiedContent or false to cancel.
     afterMessageAdd: [], // Called after a message is added to the chatlog. Args: (messageObj).
-    beforeApiCall: [], // Called before making the API call, allows modifying the payload. Args: (payload, chatbox) => modifiedPayload.
+    beforeApiCall: [], // Called before making the API call, allows modifying the payload. Args: (payload, app) => modifiedPayload.
     onChunkReceived: [], // Called when a streaming chunk is received from the API. Args: (deltaContent).
-    onMessageComplete: [], // Called when an assistant message is fully streamed/completed. Args: (messageObj, chatbox).
+    onMessageComplete: [], // Called when an assistant message is fully streamed/completed. Args: (messageObj, app).
     onError: [], // Called on API or processing errors. Args: (error).
     onFormatContent: [], // Called during content formatting (e.g., for Markdown, etc.). Args: (text, pos) => html.
     onPostFormatContent: [], // Called after content is formatted into a wrapper element. Args: (wrapperEl, messageObj, pos).
-    onRenderMessage: [], // Called when rendering a message element, allows modifying the DOM element. Args: (el, message).
-    onRenderMessageControls: [], // Called to add controls (buttons) to a message element. Args: (containerEl, message, chatlog, chatbox).
+    onRenderMessage: [], // Called when rendering a message element, allows modifying the DOM element. Args: (el, message, app).
+    onRenderMessageControls: [], // Called to add controls (buttons) to a message element. Args: (containerEl, message, chatlog, app).
     onSettingsRender: [], // Called when the settings panel is opened, allows adding elements to it. Args: (settingsEl).
     onModifySystemPrompt: [], // Called to modify the system prompt before API call. Args: (systemContent) => modifiedSystemContent.
     onStateChange: [], // Called on central state changes (e.g., receiving, apiKey). Args: (key, value).

@@ -22,7 +22,6 @@ export function getDatePrompt() {
  * If an existing message was being edited, it's restored.
  * @param {import('../state/store.js').default} store - The application's state store.
  * @param {import('../components/chatlog.js').Chatlog} chatlog - The chatlog instance.
- * @param {import('../components/chatbox.js').Chatbox} chatbox - The chatbox instance.
  */
 export function resetEditing(store, chatlog) {
     const currentEditingPos = store.get('editingPos');

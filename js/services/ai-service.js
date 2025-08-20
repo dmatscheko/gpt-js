@@ -16,11 +16,13 @@ import { defaultEndpoint } from '../config.js';
  */
 class AIService {
     /**
+     * @param {import('../app.js').default} app - The main application instance.
      * @param {import('../state/store.js').default} store - The application's state store.
      * @param {import('./config-service.js').default} configService - The configuration service.
      * @param {import('./api-service.js').default} apiService - The API service.
      */
-    constructor(store, configService, apiService) {
+    constructor(app, store, configService, apiService) {
+        this.app = app;
         this.store = store;
         this.configService = configService;
         this.apiService = apiService;
@@ -88,8 +90,7 @@ class AIService {
                 }
                 payload.messages[0].content = systemContent;
             }
-            // const chatBox = this.store.get('ui').chatBox; // Hooks might need this
-            payload = hooks.beforeApiCall.reduce((p, fn) => fn(p, null) || p, payload);
+            payload = hooks.beforeApiCall.reduce((p, fn) => fn(p, this.app) || p, payload);
 
             const endpoint = this.configService.getItem('endpoint', defaultEndpoint);
             const apiKey = this.configService.getItem('apiKey', '');

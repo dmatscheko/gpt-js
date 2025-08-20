@@ -11,7 +11,6 @@ import * as UIManager from '../ui-manager.js';
 import { hooks } from '../hooks.js';
 
 /**
- * @typedef {import('../components/chatbox.js').ChatBox} ChatBox
  * @typedef {import('../components/chatlog.js').Chatlog} Chatlog
  * @typedef {import('../components/chatlog.js').Message} Message
  */

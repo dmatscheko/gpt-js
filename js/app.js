@@ -54,7 +54,7 @@ class App {
 
         this.configService = new ConfigService(this.store);
         this.apiService = new ApiService(this.store);
-        this.aiService = new AIService(this.store, this.configService, this.apiService);
+        this.aiService = new AIService(this, this.store, this.configService, this.apiService);
         this.chatService = new ChatService(this.store, this.configService);
 
         this.settingsPanel = new SettingsPanel({

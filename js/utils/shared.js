@@ -7,6 +7,7 @@
 import { log, triggerError } from './logger.js';
 import { parseFunctionCalls, escapeXml } from './parsers.js';
 import { hooks } from '../hooks.js';
+import * as UIManager from './ui-manager.js';
 
 /**
  * Processes tool calls found in a message, filters them, executes them,
@@ -14,13 +15,13 @@ import { hooks } from '../hooks.js';
  *
  * @param {import('../components/chatlog.js').Message} message - The message containing the tool calls.
  * @param {import('../components/chatlog.js').Chatlog} chatlog - The chatlog instance.
- * @param {import('../components/chatbox.js').ChatBox} chatbox - The chatbox instance.
+ * @param {import('../app.js').default} app - The main application instance.
  * @param {function(object): boolean} filterCallback - A function to filter which tool calls to process.
  * @param {function(object): Promise<object>} executeCallback - An async function to execute a tool call and return the result.
  * @param {object} context - Additional context to pass to the callbacks.
  * @param {Array<object>} [tools=[]] - A list of available tools with their schemas.
  */
-export async function processToolCalls(message, chatlog, chatbox, filterCallback, executeCallback, context, tools = []) {
+export async function processToolCalls(message, chatlog, app, filterCallback, executeCallback, context, tools = []) {
     if (message.value.role !== 'assistant') return;
 
     const { toolCalls, positions, isSelfClosings } = parseFunctionCalls(message.value.content, tools);
@@ -54,8 +55,8 @@ export async function processToolCalls(message, chatlog, chatbox, filterCallback
         content = content.slice(0, pos.start) + startTag + content.slice(gtIndex + 1);
     }
     message.value.content = content;
-    message.cache = null;
-    chatbox.update(false);
+    const messagePos = chatlog.getMessagePos(message);
+    UIManager.updateMessageContent(messagePos, message);
 
     let toolContents = '';
     toolResults.forEach((tr, i) => {
@@ -66,9 +67,12 @@ export async function processToolCalls(message, chatlog, chatbox, filterCallback
     });
 
     if (toolContents) {
-        chatlog.addMessage({ role: 'tool', content: toolContents });
-        chatlog.addMessage(null);
-        chatbox.update();
+        const toolMessage = chatlog.addMessage({ role: 'tool', content: toolContents });
+        UIManager.addMessage(toolMessage, chatlog, chatlog.getMessagePos(toolMessage));
+
+        const assistantMsg = chatlog.addMessage(null);
+        UIManager.addMessage(assistantMsg, chatlog, chatlog.getMessagePos(assistantMsg));
+
         hooks.onGenerateAIResponse.forEach(fn => fn({}, chatlog));
     }
 }
